@@ -115,8 +115,8 @@ $RECYCLE.BIN/
 /watchpathprint/
 
 # Application-specific files
-/factuur2024012 MICHE.pdf
 *.pdf
 
 # Publish directory
+Publish/
 publish/
