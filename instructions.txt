@@ -18,3 +18,10 @@ add the code to read the config file, parse the json and start the tasks
 
 Make the print job work as following: montior a file path for files being created. When a file is created, 
 print it to the configured printer, and more the printed file to a archive folder. The archive folder should be a monthly folder.
+
+
+add the config.json as an argument to the program
+
+
+When printing a PDF in windows, the code uses the print command to print the file.
+ But this needs a pdf reader installed. Can we avoid that by using a package ? Use a library that is still maintained and free to use.

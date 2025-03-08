@@ -5,7 +5,10 @@ using System.Threading.Tasks;
 using System.Timers;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using Newtonsoft.Json;
+using PdfSharp.Pdf;
+using PdfSharp.Pdf.IO;
 #if WINDOWS
 using System.Drawing;
 using System.Drawing.Printing;
@@ -17,9 +20,25 @@ namespace CronPlus
     {
         static void Main(string[] args)
         {
+            if (args.Length == 0)
+            {
+                Console.WriteLine("Please provide the path to config.json as an argument.");
+                Console.WriteLine("Usage: cronplus <path-to-config.json>");
+                return;
+            }
+
+            string configPath = args[0];
+            if (!File.Exists(configPath))
+            {
+                Console.WriteLine($"Config file not found: {configPath}");
+                return;
+            }
+
             Console.WriteLine("CronPlus started. Press any key to exit.");
 
-            List<TaskConfig> configs = LoadConfig("Config.json");
+            Console.WriteLine($"Loading config from: {configPath}");
+            
+            List<TaskConfig> configs = LoadConfig(configPath);
 
             foreach (var config in configs)
             {
@@ -201,89 +220,123 @@ namespace CronPlus
         {
             try
             {
-                // Ensure the file exists before attempting to print
                 if (!File.Exists(filePath))
                 {
-                    throw new FileNotFoundException($"File not found: {filePath}");
+                    Console.WriteLine($"File not found: {filePath}");
+                    return;
                 }
-                
-                // Check the operating system and use the appropriate printing method
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+
+                if (Path.GetExtension(filePath).ToLower() == ".pdf")
                 {
-                    PrintFileWindows(filePath, printerName);
-                }
-                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                {
-                    PrintFileLinux(filePath, printerName);
+                    #if WINDOWS
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        PrintPdfWindows(filePath, printerName);
+                    }
+                    else
+                    {
+                        PrintPdfLinux(filePath, printerName);
+                    }
+                    #else
+                    PrintPdfLinux(filePath, printerName);
+                    #endif
                 }
                 else
                 {
-                    throw new PlatformNotSupportedException("Printing is only supported on Windows and Linux.");
+                    // For non-PDF files, use the existing print command
+                    var startInfo = new ProcessStartInfo
+                    {
+                        FileName = "print",
+                        Arguments = $"\"{filePath}\" \"{printerName}\"",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    };
+
+                    using (var process = Process.Start(startInfo))
+                    {
+                        if (process != null)
+                        {
+                            process.WaitForExit();
+                            Console.WriteLine($"File {filePath} sent to printer {printerName}");
+                        }
+                    }
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error printing file {filePath}: {ex.Message}");
-                throw;
             }
         }
-        
-        private void PrintFileLinux(string filePath, string printerName)
+
+        private void PrintPdfLinux(string filePath, string printerName)
         {
-            // Use CUPS printing system via lp command on Linux
-            // Properly quote the file path to handle spaces in filenames
-            Process process = new Process();
-            process.StartInfo.FileName = "lp";
-            process.StartInfo.Arguments = $"-d {printerName} \"{filePath}\"";
-            process.StartInfo.UseShellExecute = false;
-            process.StartInfo.RedirectStandardOutput = true;
-            process.StartInfo.RedirectStandardError = true;
-            
-            Console.WriteLine($"Executing Linux print command: lp -d {printerName} \"{filePath}\"");
-            process.Start();
-            
-            string output = process.StandardOutput.ReadToEnd();
-            string error = process.StandardError.ReadToEnd();
-            
-            process.WaitForExit();
-            
-            if (process.ExitCode != 0)
+            try
             {
-                Console.WriteLine($"Print command error output: {error}");
-                throw new Exception($"Printing failed with exit code {process.ExitCode}");
+                // On Linux, we can use lpr command to print PDF files directly
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "lpr",
+                    Arguments = $"-P \"{printerName}\" \"{filePath}\"",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                using (var process = Process.Start(startInfo))
+                {
+                    if (process != null)
+                    {
+                        process.WaitForExit();
+                        if (process.ExitCode == 0)
+                        {
+                            Console.WriteLine($"PDF file {filePath} sent to printer {printerName}");
+                        }
+                        else
+                        {
+                            var error = process.StandardError.ReadToEnd();
+                            Console.WriteLine($"Error printing PDF file: {error}");
+                        }
+                    }
+                }
             }
-            
-            Console.WriteLine($"Print job submitted successfully: {output}");
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error printing PDF file on Linux: {ex.Message}");
+            }
         }
-        
-        private void PrintFileWindows(string filePath, string printerName)
+
+        #if WINDOWS
+        [SupportedOSPlatform("windows")]
+        private void PrintPdfWindows(string filePath, string printerName)
         {
-            // For Windows, we'll use a combination of approaches depending on file type
-            string extension = Path.GetExtension(filePath).ToLower();
-            
-            // For most file types, use the ShellExecute approach
-            Process process = new Process();
-            process.StartInfo.FileName = filePath;
-            process.StartInfo.Verb = "print";
-            process.StartInfo.UseShellExecute = true;
-            process.StartInfo.CreateNoWindow = true;
-            
-            if (!string.IsNullOrEmpty(printerName))
+            using (var document = PdfReader.Open(filePath, PdfDocumentOpenMode.ReadOnly))
             {
-                // Set the default printer for the process
-                SetDefaultPrinter(printerName);
+                var printDocument = new PrintDocument();
+                printDocument.PrinterSettings.PrinterName = printerName;
+                
+                if (!printDocument.PrinterSettings.IsValid)
+                {
+                    Console.WriteLine($"Printer {printerName} is not valid.");
+                    return;
+                }
+
+                // Wait a moment to ensure the file is fully accessible
+                Task.Delay(1000).Wait();
+
+                try
+                {
+                    printDocument.Print();
+                    Console.WriteLine($"PDF file {filePath} sent to printer {printerName}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error printing PDF file {filePath}: {ex.Message}");
+                }
             }
-            
-            Console.WriteLine($"Executing Windows print command for file: {filePath} to printer: {printerName}");
-            process.Start();
-            
-            // Wait a bit to allow the print job to be submitted
-            Task.Delay(2000).Wait();
-            
-            Console.WriteLine("Print job submitted to Windows print spooler.");
         }
-        
-        [DllImport("winspool.drv", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern bool SetDefaultPrinter(string printerName);
+        #endif
     }
 }
