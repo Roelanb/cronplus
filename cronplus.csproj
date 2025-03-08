@@ -5,6 +5,12 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Authors>CronPlus Team</Authors>
+    <Description>A file monitoring and printing utility for Windows and Linux</Description>
+    <Copyright>Copyright © 2025</Copyright>
   </PropertyGroup>
   
   <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
