@@ -1,0 +1,9 @@
+[
+  {
+    "triggerType": "fileCreated",
+    "directory": "C:\\NetData",
+    "taskType": "print",
+    "printerName": "PRINTER1",
+    "archiveDirectory": "C:\\NetData\\Archive"
+  }
+]
