@@ -29,6 +29,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\cronplusservice\cronplus.csproj" />
+    <ProjectReference Include="..\cronplusservice\cronplus.csproj" />
   </ItemGroup>
 </Project>
