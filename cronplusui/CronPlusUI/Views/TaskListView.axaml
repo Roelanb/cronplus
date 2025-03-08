@@ -1,0 +1,77 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:CronPlusUI.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="CronPlusUI.Views.TaskListView"
+             x:DataType="vm:TaskListViewModel">
+  
+  <Grid RowDefinitions="Auto,*,Auto">
+    <!-- Header with buttons -->
+    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="5" Margin="5">
+      <Button Content="Add Task" Command="{Binding AddTaskCommand}"/>
+      <Button Content="Load Config" Command="{Binding LoadConfigCommand}"/>
+      <Button Content="Save Config" Command="{Binding SaveConfigCommand}"/>
+      <Button Content="Open Config" Command="{Binding OpenConfigCommand}"
+              CommandParameter="{Binding $parent[Window]}"/>
+      <TextBlock Text="{Binding ConfigPath}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+    </StackPanel>
+    
+    <!-- Task list and editor in a splitter -->
+    <Grid Grid.Row="1" ColumnDefinitions="300,*">
+      <!-- Task List -->
+      <Border Grid.Column="0" BorderBrush="Gray" BorderThickness="1" Margin="5">
+        <Grid RowDefinitions="*,Auto">
+          <ListBox Grid.Row="0" ItemsSource="{Binding Tasks}" SelectedItem="{Binding SelectedTask}">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Grid.Column="0">
+                    <TextBlock Text="{Binding TaskType}" FontWeight="Bold"/>
+                    <TextBlock Text="{Binding TriggerType}" FontSize="12"/>
+                    <TextBlock Text="{Binding Directory}" FontSize="10" Foreground="Gray"/>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Content="✏️" Command="{Binding $parent[UserControl].DataContext.EditTaskCommand}"
+                            CommandParameter="{Binding}" ToolTip.Tip="Edit Task"/>
+                    <Button Content="❌" Command="{Binding $parent[UserControl].DataContext.DeleteTaskCommand}"
+                            CommandParameter="{Binding}" ToolTip.Tip="Delete Task"/>
+                  </StackPanel>
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          
+          <!-- Status indicator -->
+          <Border Grid.Row="1" Background="#f0f0f0" Padding="5">
+            <TextBlock Text="{Binding StatusMessage}"/>
+          </Border>
+        </Grid>
+      </Border>
+      
+      <!-- Task Editor -->
+      <ContentControl Grid.Column="1" Margin="5">
+        <Panel>
+          <TextBlock Text="Select a task to edit or add a new one" IsVisible="{Binding SelectedTask, Converter={x:Static ObjectConverters.IsNull}}"/>
+          <ContentControl Content="{Binding SelectedTask}" IsVisible="{Binding SelectedTask, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <ContentControl.ContentTemplate>
+              <DataTemplate>
+                <!-- Task Editor View will be inserted here -->
+                <TextBlock Text="Task Editor will go here"/>
+              </DataTemplate>
+            </ContentControl.ContentTemplate>
+          </ContentControl>
+        </Panel>
+      </ContentControl>
+    </Grid>
+    
+    <!-- Footer with status -->
+    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="5">
+      <TextBlock Text="Tasks:" VerticalAlignment="Center"/>
+      <TextBlock Text="{Binding Tasks.Count}" VerticalAlignment="Center" Margin="5,0,0,0"/>
+      <TextBlock Text="Selected:" VerticalAlignment="Center" Margin="10,0,0,0"/>
+      <TextBlock Text="{Binding SelectedTask.TaskType}" VerticalAlignment="Center" Margin="5,0,0,0"/>
+    </StackPanel>
+  </Grid>
+</UserControl>

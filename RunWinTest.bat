@@ -1,1 +1,0 @@
-.\bin\Debug\net8.0\cronplus.exe ConfigWinTest.json
