@@ -10,8 +10,14 @@ namespace CronPlusUI.Services;
 
 public class ConfigService
 {
-    private string _defaultConfigPath = Path.Combine(
-        AppDomain.CurrentDomain.BaseDirectory, "Config.json");
+    private readonly AppConfigService _appConfigService;
+    private string _defaultConfigPath;
+    
+    public ConfigService(AppConfigService appConfigService)
+    {
+        _appConfigService = appConfigService;
+        _defaultConfigPath = _appConfigService.GetConfig().DefaultServiceConfigPath;
+    }
     
     /// <summary>
     /// Load tasks from a JSON configuration file
@@ -83,9 +89,14 @@ public class ConfigService
     /// Set the default configuration path
     /// </summary>
     /// <param name="path">New path to use as default</param>
-    public void SetDefaultConfigPath(string path)
+    public async Task SetDefaultConfigPathAsync(string path)
     {
         _defaultConfigPath = path;
+        
+        // Update the app config with the new path
+        var appConfig = _appConfigService.GetConfig();
+        appConfig.DefaultServiceConfigPath = path;
+        await _appConfigService.SaveConfigAsync(appConfig);
     }
     
     /// <summary>

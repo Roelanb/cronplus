@@ -22,7 +22,7 @@ public class TaskListViewModel : ViewModelBase
 
     public TaskListViewModel()
     {
-        _configService = new ConfigService();
+        _configService = App.ConfigService;
         _tasks = new ObservableCollection<TaskModel>();
         _configPath = _configService.GetDefaultConfigPath();
         
@@ -183,7 +183,7 @@ public class TaskListViewModel : ViewModelBase
         if (result != null && result.Length > 0)
         {
             ConfigPath = result[0];
-            _configService.SetDefaultConfigPath(ConfigPath);
+            await _configService.SetDefaultConfigPathAsync(ConfigPath);
             await LoadConfigAsync();
         }
     }

@@ -1,0 +1,6 @@
+{
+  "DefaultServiceConfigPath": "Config.json",
+  "Theme": "Light",
+  "AutoStartService": false,
+  "MinimizeToTray": true
+}
