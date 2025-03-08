@@ -15,6 +15,7 @@ public class TaskListViewModel : ViewModelBase
     private readonly ConfigService _configService;
     private ObservableCollection<TaskModel> _tasks;
     private TaskModel? _selectedTask;
+    private TaskEditorViewModel? _taskEditorViewModel;
     private bool _isLoading;
     private string _statusMessage = string.Empty;
     private string _configPath;
@@ -47,7 +48,20 @@ public class TaskListViewModel : ViewModelBase
     public TaskModel? SelectedTask
     {
         get => _selectedTask;
-        set => SetProperty(ref _selectedTask, value);
+        set
+        {
+            if (SetProperty(ref _selectedTask, value))
+            {
+                // Update the editor view model when selected task changes
+                TaskEditorViewModel = value != null ? new TaskEditorViewModel(value) : null;
+            }
+        }
+    }
+    
+    public TaskEditorViewModel? TaskEditorViewModel
+    {
+        get => _taskEditorViewModel;
+        private set => SetProperty(ref _taskEditorViewModel, value);
     }
     
     public bool IsLoading

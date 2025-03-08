@@ -1,0 +1,117 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:CronPlusUI.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="450"
+             x:Class="CronPlusUI.Views.TaskEditorView"
+             x:DataType="vm:TaskEditorViewModel"
+             x:Name="TaskEditorViewRoot">
+
+  <ScrollViewer>
+    <Border Background="#F9F9F9" BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="5" Padding="10">
+      <StackPanel Spacing="10">
+        <TextBlock Text="Task Configuration" FontWeight="Bold" FontSize="18" Margin="0,0,0,10"/>
+        
+        <!-- Task Type Selection -->
+        <Grid ColumnDefinitions="150,*" RowDefinitions="Auto">
+          <TextBlock Grid.Column="0" Text="Task Type:" VerticalAlignment="Center"/>
+          <ComboBox Grid.Column="1" 
+                    ItemsSource="{Binding AvailableTaskTypes}"
+                    SelectedItem="{Binding Task.TaskType}"/>
+        </Grid>
+
+        <!-- Trigger Type Selection -->
+        <Grid ColumnDefinitions="150,*" RowDefinitions="Auto">
+          <TextBlock Grid.Column="0" Text="Trigger Type:" VerticalAlignment="Center"/>
+          <ComboBox Grid.Column="1"
+                    ItemsSource="{Binding AvailableTriggerTypes}"
+                    SelectedItem="{Binding Task.TriggerType}"/>
+        </Grid>
+
+        <!-- Directory with file browser -->
+        <Grid ColumnDefinitions="150,*,Auto" RowDefinitions="Auto">
+          <TextBlock Grid.Column="0" Text="Directory:" VerticalAlignment="Center"/>
+          <TextBox Grid.Column="1" Text="{Binding Task.Directory}"/>
+          <Button Grid.Column="2" Content="Browse..." 
+                  Command="{Binding BrowseDirectoryCommand}"
+                  CommandParameter="{Binding $parent[Window]}"
+                  Margin="5,0,0,0"/>
+        </Grid>
+
+        <!-- Source File (Conditional based on task type) -->
+        <Grid ColumnDefinitions="150,*,Auto" RowDefinitions="Auto"
+              IsVisible="{Binding Task.TaskType, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <TextBlock Grid.Column="0" Text="Source File:" VerticalAlignment="Center"/>
+          <TextBox Grid.Column="1" Text="{Binding Task.SourceFile}"/>
+          <Button Grid.Column="2" Content="Browse..."
+                  Command="{Binding BrowseSourceFileCommand}"
+                  CommandParameter="{Binding $parent[Window]}"
+                  Margin="5,0,0,0"/>
+        </Grid>
+
+        <!-- Destination File (for copy/move tasks) -->
+        <Grid ColumnDefinitions="150,*,Auto" RowDefinitions="Auto"
+              IsVisible="{Binding Task.TaskType, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <TextBlock Grid.Column="0" Text="Destination File:" VerticalAlignment="Center"/>
+          <TextBox Grid.Column="1" Text="{Binding Task.DestinationFile}"/>
+          <Button Grid.Column="2" Content="Browse..."
+                  Command="{Binding BrowseDestinationFileCommand}" 
+                  CommandParameter="{Binding $parent[Window]}"
+                  Margin="5,0,0,0"/>
+        </Grid>
+
+        <!-- Archive Directory (for move tasks) -->
+        <Grid ColumnDefinitions="150,*,Auto" RowDefinitions="Auto"
+              IsVisible="{Binding Task.TaskType, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <TextBlock Grid.Column="0" Text="Archive Directory:" VerticalAlignment="Center"/>
+          <TextBox Grid.Column="1" Text="{Binding Task.ArchiveDirectory}"/>
+          <Button Grid.Column="2" Content="Browse..."
+                  Command="{Binding BrowseArchiveDirectoryCommand}"
+                  CommandParameter="{Binding $parent[Window]}"
+                  Margin="5,0,0,0"/>
+        </Grid>
+
+        <!-- Printer Selection (for print tasks) -->
+        <Grid ColumnDefinitions="150,*,Auto" RowDefinitions="Auto"
+              IsVisible="{Binding Task.TaskType, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <TextBlock Grid.Column="0" Text="Printer:" VerticalAlignment="Center"/>
+          <ComboBox Grid.Column="1" 
+                    ItemsSource="{Binding AvailablePrinters}"
+                    SelectedItem="{Binding Task.PrinterName}"
+                    IsEnabled="{Binding !IsLoading}"/>
+          <Button Grid.Column="2" Content="Refresh"
+                  Command="{Binding RefreshPrintersCommand}"
+                  IsEnabled="{Binding !IsLoading}"
+                  Margin="5,0,0,0"/>
+        </Grid>
+
+        <!-- Time (for time-based triggers) -->
+        <Grid ColumnDefinitions="150,*" RowDefinitions="Auto"
+              IsVisible="{Binding Task.TriggerType, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <TextBlock Grid.Column="0" Text="Time:" VerticalAlignment="Center"/>
+          <TextBox Grid.Column="1" Text="{Binding Task.Time}"
+                   Watermark="Format: HH:MM:SS or cron expression"/>
+        </Grid>
+
+        <!-- Interval (for interval-based triggers) -->
+        <Grid ColumnDefinitions="150,*" RowDefinitions="Auto"
+              IsVisible="{Binding Task.TriggerType, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <TextBlock Grid.Column="0" Text="Interval (seconds):" VerticalAlignment="Center"/>
+          <NumericUpDown Grid.Column="1" Value="{Binding Task.Interval}"
+                        Minimum="1" Maximum="86400"/>
+        </Grid>
+
+        <!-- Status bar -->
+        <Border Background="#EAEAEA" Padding="5" Margin="0,10,0,0"
+                IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <Grid ColumnDefinitions="Auto,*">
+            <ProgressBar Grid.Column="0" IsIndeterminate="True" Width="20" Height="20" 
+                         IsVisible="{Binding IsLoading}" Margin="0,0,5,0"/>
+            <TextBlock Grid.Column="1" Text="{Binding StatusMessage}" VerticalAlignment="Center"/>
+          </Grid>
+        </Border>
+      </StackPanel>
+    </Border>
+  </ScrollViewer>
+</UserControl>

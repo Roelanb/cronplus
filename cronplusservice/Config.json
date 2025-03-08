@@ -1,37 +1,68 @@
 [
   {
-    "triggerType": "fileCreated",
-    "directory": "/media/bart/Data1/Projects/cronplus/cronplusservice/watchpathprint",
-    "taskType": "print",
-    "printerName": "Brother_DCP_J4120DW",
-    "archiveDirectory": "/media/bart/Data1/Projects/cronplus/cronplusservice/archive"
+    "TriggerType": "fileCreated",
+    "Directory": "/media/bart/Data1/Projects/cronplus/cronplusservice/watchpathprint",
+    "TaskType": "print",
+    "SourceFile": null,
+    "DestinationFile": null,
+    "Time": null,
+    "Interval": 0,
+    "PrinterName": "Brother_DCP_J4120DW",
+    "ArchiveDirectory": "/media/bart/Data1/Projects/cronplus/cronplusservice/archive"
   },
   {
-    "triggerType": "fileCreated",
-    "directory": "/media/bart/Data1/Projects/cronplus/cronplusservice/watchpath",
-    "taskType": "copy",
-    "sourceFile": "/path/to/source/file.txt",
-    "destinationFile": "/path/to/destination/file.txt"
+    "TriggerType": "fileCreated",
+    "Directory": "/media/bart/Data1/Projects/cronplus/cronplusservice/watchpath",
+    "TaskType": "copy",
+    "SourceFile": "/path/to/source/file.txt",
+    "DestinationFile": "/path/to/destination/file.txt",
+    "Time": null,
+    "Interval": 0,
+    "PrinterName": "Brother_DCP_J4120DW",
+    "ArchiveDirectory": null
   },
   {
-    "triggerType": "fileRenamed",
-    "directory": "/media/bart/Data1/Projects/cronplus/cronplusservice/watchpath",
-    "taskType": "move",
-    "sourceFile": "/path/to/source/file.txt",
-    "destinationFile": "/path/to/destination/file.txt"
+    "TriggerType": "fileRenamed",
+    "Directory": "/media/bart/Data1/Projects/cronplus/cronplusservice/watchpath",
+    "TaskType": "move",
+    "SourceFile": "/path/to/source/file.txt",
+    "DestinationFile": "/path/to/destination/file.txt",
+    "Time": null,
+    "Interval": 0,
+    "PrinterName": "Brother_DCP_J4120DW",
+    "ArchiveDirectory": null
   },
   {
-    "triggerType": "time",
-    "time": "21:00",
-    "taskType": "print",
-    "sourceFile": "/media/bart/Data1/Projects/cronplus/cronplusservice/watchpathprint/file.txt",
-    "printerName": "DefaultPrinter"
+    "TriggerType": "time",
+    "Directory": "",
+    "TaskType": "print",
+    "SourceFile": "/media/bart/Data1/Projects/cronplus/cronplusservice/watchpathprint/file.txt",
+    "DestinationFile": null,
+    "Time": "21:00",
+    "Interval": 0,
+    "PrinterName": "DefaultPrinter",
+    "ArchiveDirectory": null
   },
   {
-    "triggerType": "interval",
-    "interval": "60",
-    "taskType": "copy",
-    "sourceFile": "/media/bart/Data1/Projects/cronplus/cronplusservice/watchpath/to/source/file.txt",
-    "destinationFile": "/path/to/destination/file.txt"
+    "TriggerType": "interval",
+    "Directory": "",
+    "TaskType": "copy",
+    "SourceFile": "/media/bart/Data1/Projects/cronplus/cronplusservice/watchpath/to/source/file.txt",
+    "DestinationFile": "/path/to/destination/file.txt",
+    "Time": null,
+    "Interval": 60,
+    "PrinterName": "Brother_DCP_J4120DW",
+    "ArchiveDirectory": null
+  },
+  {
+    "TriggerType": "fileCreated",
+    "Directory": "/media/bart/Data1/Projects/cronplus/cronplusservice",
+    "TaskType": "print",
+    "SourceFile": null,
+    "DestinationFile": null,
+    "Time": null,
+    "Interval": 0,
+    "PrinterName": "Brother_DCP_J4120DW",
+    "ArchiveDirectory": null
   }
 ]
