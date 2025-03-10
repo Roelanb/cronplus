@@ -25,6 +25,40 @@ public class AppConfigService
     }
     
     /// <summary>
+    /// Load application configuration from the config file (synchronous version)
+    /// </summary>
+    /// <returns>The loaded AppConfig</returns>
+    public AppConfig LoadConfig()
+    {
+        try
+        {
+            if (File.Exists(_appConfigPath))
+            {
+                string json = File.ReadAllText(_appConfigPath);
+                var config = JsonConvert.DeserializeObject<AppConfig>(json);
+                
+                if (config != null)
+                {
+                    _currentConfig = config;
+                }
+            }
+            else
+            {
+                // If config doesn't exist, create it with defaults
+                string json = JsonConvert.SerializeObject(_currentConfig, Formatting.Indented);
+                File.WriteAllText(_appConfigPath, json);
+            }
+            
+            return _currentConfig;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading application configuration: {ex.Message}");
+            return _currentConfig; // Return default config on error
+        }
+    }
+    
+    /// <summary>
     /// Load application configuration from the config file
     /// </summary>
     /// <returns>The loaded AppConfig</returns>

@@ -65,8 +65,50 @@ dotnet publish ./cronplusui/CronPlusUI.csproj \
 
 # Copy default config files
 echo "Copying default configuration files..."
-cp ./cronplusui/AppConfig.json ./Publish/linux/cronplusui/ || echo "Warning: Could not copy AppConfig.json to Linux build"
-cp ./cronplusui/AppConfig.json ./Publish/windows/cronplusui/ || echo "Warning: Could not copy AppConfig.json to Windows build"
+
+# Copy AppConfig.json with explicit verification
+echo "Copying AppConfig.json to Linux build..."
+cp -v ./cronplusui/AppConfig.json ./Publish/linux/cronplusui/ || echo "ERROR: Failed to copy AppConfig.json to Linux build"
+
+echo "Copying AppConfig.json to Windows build..."
+cp -v ./cronplusui/AppConfig.json ./Publish/windows/cronplusui/ || echo "ERROR: Failed to copy AppConfig.json to Windows build"
+
+# Copy Config.json for both service and UI
+cp -v ./cronplusservice/Config.json ./Publish/linux/cronplusservice/ || echo "Warning: Could not copy Config.json to Linux service build"
+cp -v ./cronplusservice/Config.json ./Publish/windows/cronplusservice/ || echo "Warning: Could not copy Config.json to Windows service build"
+cp -v ./cronplusservice/Config.json ./Publish/linux/cronplusui/ || echo "Warning: Could not copy Config.json to Linux UI build"
+cp -v ./cronplusservice/Config.json ./Publish/windows/cronplusui/ || echo "Warning: Could not copy Config.json to Windows UI build"
+
+# Verify that AppConfig.json exists in the publish directories
+echo "Verifying AppConfig.json in publish directories..."
+if [ -f "./Publish/linux/cronplusui/AppConfig.json" ]; then
+    echo "✓ AppConfig.json exists in Linux UI build"
+    cat ./Publish/linux/cronplusui/AppConfig.json
+else
+    echo "✗ AppConfig.json MISSING in Linux UI build - creating it"
+    cat > ./Publish/linux/cronplusui/AppConfig.json << EOL
+{
+  "DefaultServiceConfigPath": "Config.json",
+  "Theme": "Light",
+  "AutoStartService": false,
+  "MinimizeToTray": true
+}
+EOL
+fi
+
+if [ -f "./Publish/windows/cronplusui/AppConfig.json" ]; then
+    echo "✓ AppConfig.json exists in Windows UI build"
+else
+    echo "✗ AppConfig.json MISSING in Windows UI build - creating it"
+    cat > ./Publish/windows/cronplusui/AppConfig.json << EOL
+{
+  "DefaultServiceConfigPath": "Config.json",
+  "Theme": "Light",
+  "AutoStartService": false,
+  "MinimizeToTray": true
+}
+EOL
+fi
 
 # Create README files with instructions
 echo "Creating README files..."

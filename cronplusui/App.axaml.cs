@@ -30,7 +30,7 @@ public partial class App : Application
     private void InitializeServices()
     {
         // Load application configuration synchronously
-        AppConfigService.LoadConfigAsync().GetAwaiter().GetResult();
+        AppConfigService.LoadConfig();
     }
 
     public override void OnFrameworkInitializationCompleted()
