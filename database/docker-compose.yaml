@@ -1,0 +1,15 @@
+version: "3"
+services:
+  surrealdb:
+    image: docker.io/surrealdb/surrealdb:latest
+    command: start --username root --password root --bind 0.0.0.0:8000 file:/var/lib/surrealdb/database.db
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/var/lib/surrealdb
+    environment:
+      SURREALDB_USER: root
+      SURREALDB_PASS: root
+      SURREALDB_DB: cronplus
+      SURREALDB_LOG: info

@@ -9,6 +9,9 @@ using Newtonsoft.Json;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
 using CronPlus.Tasks;
+using CronPlus.Storage;
+using CronPlus.Models;
+using CronPlus.Storage;
 #if WINDOWS
 using System.Drawing;
 using System.Drawing.Printing;
@@ -18,28 +21,36 @@ namespace CronPlus;
 
 class Program
 {
-    static void Main(string[] args)
+    static async Task Main(string[] args)
     {
-        string configPath = args.Length > 0 ? args[0] : "Config.json";
-
-        if (!File.Exists(configPath))
+        var dataStore = new DataStore();
+        var configs = await LoadConfig(dataStore);
+        var validConfigs = new List<TaskConfig>();
+        var validationResults = new Dictionary<TaskConfig, List<string>>();
+        
+        foreach (var config in configs)
         {
-            Console.WriteLine($"Config file not found: {configPath}");
-            return;
+            var errors = TaskConfigValidator.Validate(config);
+            validationResults[config] = errors;
+            if (errors.Count > 0)
+            {
+                Console.WriteLine($"Invalid TaskConfig for directory '{config.Directory}':");
+                foreach (var error in errors)
+                    Console.WriteLine("  - " + error);
+                continue;
+            }
+            validConfigs.Add(config);
         }
-
-        Console.WriteLine("CronPlus started. Press any key to exit.");
-        Console.WriteLine($"Loading config from: {configPath}");
-
-        List<TaskConfig> configs = LoadConfig(configPath);
+        
+        ConsoleDumper.DumpTaskConfigsWithValidity(configs, validationResults);
         
         // Group configs by directory for file system triggers
         var directoryConfigs = new Dictionary<string, List<TaskConfig>>();
         
-        foreach (var config in configs)
+        foreach (var config in validConfigs)
         {
             // Handle file system triggers (file created or renamed)
-            if (config.TriggerType == "fileCreated" || config.TriggerType == "fileRenamed")
+            if (config.TriggerType == TriggerType.FileCreated || config.TriggerType == TriggerType.FileRenamed)
             {
                 if (!directoryConfigs.ContainsKey(config.Directory))
                 {
@@ -57,18 +68,17 @@ class Program
             var directory = entry.Key;
             var dirConfigs = entry.Value;
             
-            var fileSystemTrigger = new FileSystemTaskTrigger(directory, dirConfigs);
+            var fileSystemTrigger = new FileSystemTaskTrigger(directory, dirConfigs, dataStore);
             fileSystemTrigger.Start();
         }
 
         Console.ReadKey();
     }
 
-    static List<TaskConfig> LoadConfig(string filePath)
+    static async Task<List<TaskConfig>> LoadConfig(DataStore dataStore)
     {
-        string json = File.ReadAllText(filePath);
-        var configs = JsonConvert.DeserializeObject<List<TaskConfig>>(json);
-        return configs ?? new List<TaskConfig>();
+        var result = await dataStore.GetConfigs();
+        
+        return result;
     }
 }
-

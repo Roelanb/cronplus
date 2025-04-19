@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using PdfSharp.Pdf.IO;
+using CronPlus.Models;
 #if WINDOWS
 using System.Drawing;
 using System.Drawing.Printing;

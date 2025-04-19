@@ -1,6 +1,0 @@
-to manage the tasks in the cronplusservice, I want to build a UI. The ui shouuld work in linux and windows. What is the best way to do that?
-
-Add a config file to the ui application so we can store configuration info for this app like the default config file to load for the service.
-
-
-publish both apps in the Publish folder, create a folder for each operating system (linux, windows)

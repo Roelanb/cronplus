@@ -31,7 +31,7 @@ CronPlus is a file monitoring and automated printing utility that watches specif
 
 ## Configuration
 
-The program uses a JSON configuration file to specify monitoring tasks. Example configuration:
+The program uses SurrealDB to store configuration. Example configuration:
 
 ```json
 [
@@ -57,6 +57,12 @@ The program uses a JSON configuration file to specify monitoring tasks. Example 
     "destinationFile": "C:\\Backup\\backup.txt"
   }
 ]
+```
+
+To start SurrealDB:
+
+```bash
+surreal start --user root --pass root rocksdb:cronplusstorage.db
 ```
 
 ### Configuration Options

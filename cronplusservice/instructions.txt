@@ -25,3 +25,13 @@ add the config.json as an argument to the program
 
 When printing a PDF in windows, the code uses the print command to print the file.
  But this needs a pdf reader installed. Can we avoid that by using a package ? Use a library that is still maintained and free to use.
+
+
+ Change the TriggerType to enum, with values: FileCreated, FileRenamed, Time, Interval.
+
+ Check the TaskConfigs for validity, the directory, printer etc should be valid
+
+ Add a TaskLogging model and store the data in SurrealDB. The TaskLogging should keep track of all tasks being triggered, when they are triggered, and the result of the task.
+
+ add a static helper class to dump information to the console. Output the list of configs and their validity into a table.
+ use https://github.com/khalidabuhakmeh/ConsoleTables

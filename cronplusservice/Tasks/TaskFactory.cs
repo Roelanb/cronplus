@@ -1,4 +1,5 @@
 using System;
+using CronPlus.Models;
 
 namespace CronPlus.Tasks;
 
@@ -14,10 +15,7 @@ public static class TaskFactory
     /// <returns>Task implementation</returns>
     public static ITask CreateTask(TaskConfig config)
     {
-        if (config == null)
-        {
-            throw new ArgumentNullException(nameof(config));
-        }
+        ArgumentNullException.ThrowIfNull(config);
 
         return config.TaskType.ToLower() switch
         {
