@@ -51,6 +51,7 @@
     "@tanstack/react-query": "^5.28.0",
     "@tanstack/react-query-devtools": "^5.28.0",
     "@tanstack/react-table": "^8.14.0",
+    "@tauri-apps/api": "^2.5.0",
     "axios": "^1.6.8",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
@@ -80,6 +81,7 @@
     "zod": "^3.24.3"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.5.0",
     "@types/node": "^20.11.27",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
