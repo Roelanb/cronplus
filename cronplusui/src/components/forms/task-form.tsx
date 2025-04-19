@@ -1,25 +1,46 @@
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useDatabase } from "@/hooks/use-database";
-import { TaskConfig, TriggerType } from "@/types/taskConfig";
+import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
+import { useDatabase } from '@/hooks/use-database';
+import { TaskConfig, TriggerType } from '@/types/taskConfig';
 
 const taskFormSchema = z.object({
   triggerType: z.nativeEnum(TriggerType),
-  directory: z.string().min(1, "Directory is required"),
-  taskType: z.string().min(1, "Task type is required"),
+  directory: z.string().min(1, 'Directory is required'),
+  taskType: z.string().min(1, 'Task type is required'),
   sourceFile: z.string().optional(),
   destinationFile: z.string().optional(),
   time: z.string().optional(),
   interval: z.coerce.number().optional(),
   printerName: z.string().optional(),
-  archiveDirectory: z.string().optional(),
+  archiveDirectory: z.string().optional()
 });
 
 type TaskFormValues = z.infer<typeof taskFormSchema>;
@@ -28,11 +49,17 @@ interface TaskFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialData?: TaskConfig;
-  mode: "create" | "edit";
+  mode: 'create' | 'edit';
 }
 
-export function TaskForm({ open, onOpenChange, initialData, mode }: TaskFormProps) {
-  const { createTaskConfig, updateTaskConfig, refreshTaskConfigs } = useDatabase();
+export function TaskForm({
+  open,
+  onOpenChange,
+  initialData,
+  mode
+}: TaskFormProps) {
+  const { createTaskConfig, updateTaskConfig, refreshTaskConfigs } =
+    useDatabase();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,15 +67,15 @@ export function TaskForm({ open, onOpenChange, initialData, mode }: TaskFormProp
     resolver: zodResolver(taskFormSchema),
     defaultValues: {
       triggerType: initialData?.triggerType || TriggerType.FileCreated,
-      directory: initialData?.directory || "",
-      taskType: initialData?.taskType || "",
-      sourceFile: initialData?.sourceFile || "",
-      destinationFile: initialData?.destinationFile || "",
-      time: initialData?.time || "",
+      directory: initialData?.directory || '',
+      taskType: initialData?.taskType || '',
+      sourceFile: initialData?.sourceFile || '',
+      destinationFile: initialData?.destinationFile || '',
+      time: initialData?.time || '',
       interval: initialData?.interval,
-      printerName: initialData?.printerName || "",
-      archiveDirectory: initialData?.archiveDirectory || "",
-    },
+      printerName: initialData?.printerName || '',
+      archiveDirectory: initialData?.archiveDirectory || ''
+    }
   });
 
   // Reset form when initialData changes
@@ -58,24 +85,24 @@ export function TaskForm({ open, onOpenChange, initialData, mode }: TaskFormProp
         triggerType: initialData.triggerType,
         directory: initialData.directory,
         taskType: initialData.taskType,
-        sourceFile: initialData.sourceFile || "",
-        destinationFile: initialData.destinationFile || "",
-        time: initialData.time || "",
+        sourceFile: initialData.sourceFile || '',
+        destinationFile: initialData.destinationFile || '',
+        time: initialData.time || '',
         interval: initialData.interval,
-        printerName: initialData.printerName || "",
-        archiveDirectory: initialData.archiveDirectory || "",
+        printerName: initialData.printerName || '',
+        archiveDirectory: initialData.archiveDirectory || ''
       });
     } else {
       form.reset({
         triggerType: TriggerType.FileCreated,
-        directory: "",
-        taskType: "",
-        sourceFile: "",
-        destinationFile: "",
-        time: "",
+        directory: '',
+        taskType: '',
+        sourceFile: '',
+        destinationFile: '',
+        time: '',
         interval: undefined,
-        printerName: "",
-        archiveDirectory: "",
+        printerName: '',
+        archiveDirectory: ''
       });
     }
     // Clear any previous errors when the form is reset
@@ -86,54 +113,58 @@ export function TaskForm({ open, onOpenChange, initialData, mode }: TaskFormProp
   const onSubmit = async (values: TaskFormValues) => {
     setIsSubmitting(true);
     setError(null);
-    
+
     try {
       let success = false;
-      
-      if (mode === "create") {
+
+      if (mode === 'create') {
         const result = await createTaskConfig(values);
         success = !!result;
-      } else if (mode === "edit" && initialData?.id) {
+      } else if (mode === 'edit' && initialData?.id) {
         const result = await updateTaskConfig(initialData.id, values);
         success = !!result;
       }
-      
+
       if (success) {
         // Explicitly refresh the task list to update the UI
         await refreshTaskConfigs();
         onOpenChange(false);
       } else {
-        setError("Failed to save task. Please try again.");
+        setError('Failed to save task. Please try again.');
       }
     } catch (error) {
-      console.error("Error saving task:", error);
-      setError(`Error: ${error instanceof Error ? error.message : "Unknown error occurred"}`);
+      console.error('Error saving task:', error);
+      setError(
+        `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   // Handle displaying different fields based on trigger type
-  const triggerType = form.watch("triggerType");
+  const triggerType = form.watch('triggerType');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>{mode === "create" ? "Create Task" : "Edit Task"}</DialogTitle>
+          <DialogTitle>
+            {mode === 'create' ? 'Create Task' : 'Edit Task'}
+          </DialogTitle>
           <DialogDescription>
-            {mode === "create" 
-              ? "Create a new task configuration" 
-              : "Edit the existing task configuration"}
+            {mode === 'create'
+              ? 'Create a new task configuration'
+              : 'Edit the existing task configuration'}
           </DialogDescription>
         </DialogHeader>
-        
+
         {error && (
-          <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="mb-4 rounded border border-red-400 bg-red-50 px-4 py-3 text-red-700">
             <p>{error}</p>
           </div>
         )}
-        
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
@@ -154,10 +185,18 @@ export function TaskForm({ open, onOpenChange, initialData, mode }: TaskFormProp
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value={TriggerType.FileCreated}>File Created</SelectItem>
-                      <SelectItem value={TriggerType.FileRenamed}>File Renamed</SelectItem>
-                      <SelectItem value={TriggerType.Time}>Schedule (Cron)</SelectItem>
-                      <SelectItem value={TriggerType.Interval}>Interval</SelectItem>
+                      <SelectItem value={TriggerType.FileCreated}>
+                        File Created
+                      </SelectItem>
+                      <SelectItem value={TriggerType.FileRenamed}>
+                        File Renamed
+                      </SelectItem>
+                      <SelectItem value={TriggerType.Time}>
+                        Schedule (Cron)
+                      </SelectItem>
+                      <SelectItem value={TriggerType.Interval}>
+                        Interval
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -201,10 +240,10 @@ export function TaskForm({ open, onOpenChange, initialData, mode }: TaskFormProp
                 <FormItem>
                   <FormLabel>Directory</FormLabel>
                   <FormControl>
-                    <Input 
+                    <Input
                       disabled={isSubmitting}
-                      placeholder="/path/to/directory" 
-                      {...field} 
+                      placeholder="/path/to/directory"
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />
@@ -220,10 +259,10 @@ export function TaskForm({ open, onOpenChange, initialData, mode }: TaskFormProp
                   <FormItem>
                     <FormLabel>Schedule (Cron Expression)</FormLabel>
                     <FormControl>
-                      <Input 
+                      <Input
                         disabled={isSubmitting}
-                        placeholder="* * * * *" 
-                        {...field} 
+                        placeholder="* * * * *"
+                        {...field}
                       />
                     </FormControl>
                     <FormDescription>
@@ -243,12 +282,12 @@ export function TaskForm({ open, onOpenChange, initialData, mode }: TaskFormProp
                   <FormItem>
                     <FormLabel>Interval (seconds)</FormLabel>
                     <FormControl>
-                      <Input 
+                      <Input
                         disabled={isSubmitting}
-                        type="number" 
-                        min="1" 
-                        placeholder="60" 
-                        {...field} 
+                        type="number"
+                        min="1"
+                        placeholder="60"
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -258,11 +297,11 @@ export function TaskForm({ open, onOpenChange, initialData, mode }: TaskFormProp
             )}
 
             {/* Source File - for File triggers or Copy/Move operations */}
-            {(triggerType === TriggerType.FileCreated || 
-              triggerType === TriggerType.FileRenamed || 
-              form.watch("taskType") === "Copy" || 
-              form.watch("taskType") === "Move" || 
-              form.watch("taskType") === "Print") && (
+            {(triggerType === TriggerType.FileCreated ||
+              triggerType === TriggerType.FileRenamed ||
+              form.watch('taskType') === 'Copy' ||
+              form.watch('taskType') === 'Move' ||
+              form.watch('taskType') === 'Print') && (
               <FormField
                 control={form.control}
                 name="sourceFile"
@@ -270,10 +309,10 @@ export function TaskForm({ open, onOpenChange, initialData, mode }: TaskFormProp
                   <FormItem>
                     <FormLabel>Source File</FormLabel>
                     <FormControl>
-                      <Input 
+                      <Input
                         disabled={isSubmitting}
-                        placeholder="file.txt or *.pdf" 
-                        {...field} 
+                        placeholder="file.txt or *.pdf"
+                        {...field}
                       />
                     </FormControl>
                     <FormDescription>
@@ -286,7 +325,8 @@ export function TaskForm({ open, onOpenChange, initialData, mode }: TaskFormProp
             )}
 
             {/* Destination File - for Copy/Move operations */}
-            {(form.watch("taskType") === "Copy" || form.watch("taskType") === "Move") && (
+            {(form.watch('taskType') === 'Copy' ||
+              form.watch('taskType') === 'Move') && (
               <FormField
                 control={form.control}
                 name="destinationFile"
@@ -294,10 +334,10 @@ export function TaskForm({ open, onOpenChange, initialData, mode }: TaskFormProp
                   <FormItem>
                     <FormLabel>Destination File</FormLabel>
                     <FormControl>
-                      <Input 
+                      <Input
                         disabled={isSubmitting}
-                        placeholder="/path/to/destination.txt" 
-                        {...field} 
+                        placeholder="/path/to/destination.txt"
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -307,7 +347,7 @@ export function TaskForm({ open, onOpenChange, initialData, mode }: TaskFormProp
             )}
 
             {/* Printer Name - for Print operation */}
-            {form.watch("taskType") === "Print" && (
+            {form.watch('taskType') === 'Print' && (
               <FormField
                 control={form.control}
                 name="printerName"
@@ -315,10 +355,10 @@ export function TaskForm({ open, onOpenChange, initialData, mode }: TaskFormProp
                   <FormItem>
                     <FormLabel>Printer Name</FormLabel>
                     <FormControl>
-                      <Input 
+                      <Input
                         disabled={isSubmitting}
-                        placeholder="Default Printer" 
-                        {...field} 
+                        placeholder="Default Printer"
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -335,10 +375,10 @@ export function TaskForm({ open, onOpenChange, initialData, mode }: TaskFormProp
                 <FormItem>
                   <FormLabel>Archive Directory (Optional)</FormLabel>
                   <FormControl>
-                    <Input 
+                    <Input
                       disabled={isSubmitting}
-                      placeholder="/path/to/archive" 
-                      {...field} 
+                      placeholder="/path/to/archive"
+                      {...field}
                     />
                   </FormControl>
                   <FormDescription>
@@ -359,7 +399,11 @@ export function TaskForm({ open, onOpenChange, initialData, mode }: TaskFormProp
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : mode === "create" ? "Create" : "Save Changes"}
+                {isSubmitting
+                  ? 'Saving...'
+                  : mode === 'create'
+                    ? 'Create'
+                    : 'Save Changes'}
               </Button>
             </DialogFooter>
           </form>

@@ -9,18 +9,27 @@ interface DatabaseContextProps {
   taskConfigs: TaskConfig[];
   refreshTaskConfigs: () => Promise<void>;
   getTaskConfig: (id: string) => Promise<TaskConfig | null>;
-  createTaskConfig: (taskConfig: Omit<TaskConfig, 'id'>) => Promise<TaskConfig | null>;
-  updateTaskConfig: (id: string, taskConfig: Partial<TaskConfig>) => Promise<TaskConfig | null>;
+  createTaskConfig: (
+    taskConfig: Omit<TaskConfig, 'id'>
+  ) => Promise<TaskConfig | null>;
+  updateTaskConfig: (
+    id: string,
+    taskConfig: Partial<TaskConfig>
+  ) => Promise<TaskConfig | null>;
   deleteTaskConfig: (id: string) => Promise<boolean>;
 }
 
-const DatabaseContext = createContext<DatabaseContextProps | undefined>(undefined);
+const DatabaseContext = createContext<DatabaseContextProps | undefined>(
+  undefined
+);
 
 interface DatabaseProviderProps {
   children: ReactNode;
 }
 
-export const DatabaseProvider: React.FC<DatabaseProviderProps> = ({ children }) => {
+export const DatabaseProvider: React.FC<DatabaseProviderProps> = ({
+  children
+}) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +45,9 @@ export const DatabaseProvider: React.FC<DatabaseProviderProps> = ({ children }) 
         setIsConnected(true);
         await refreshTaskConfigs();
       } catch (err) {
-        setError(`Failed to connect to database: ${err instanceof Error ? err.message : String(err)}`);
+        setError(
+          `Failed to connect to database: ${err instanceof Error ? err.message : String(err)}`
+        );
         console.error('Database connection error:', err);
       } finally {
         setIsLoading(false);
@@ -56,7 +67,7 @@ export const DatabaseProvider: React.FC<DatabaseProviderProps> = ({ children }) 
           }
         }
       };
-      
+
       disconnectFromDatabase();
     };
   }, [isConnected]);
@@ -68,10 +79,12 @@ export const DatabaseProvider: React.FC<DatabaseProviderProps> = ({ children }) 
       const configs = await surrealDbService.getAllTaskConfigs();
 
       console.log('Fetched task configs:', configs);
-      
+
       setTaskConfigs(configs);
     } catch (err) {
-      setError(`Failed to fetch task configs: ${err instanceof Error ? err.message : String(err)}`);
+      setError(
+        `Failed to fetch task configs: ${err instanceof Error ? err.message : String(err)}`
+      );
       console.error('Error fetching task configs:', err);
     } finally {
       setIsLoading(false);
@@ -84,7 +97,9 @@ export const DatabaseProvider: React.FC<DatabaseProviderProps> = ({ children }) 
   };
 
   // Create a new task config
-  const createTaskConfig = async (taskConfig: Omit<TaskConfig, 'id'>): Promise<TaskConfig | null> => {
+  const createTaskConfig = async (
+    taskConfig: Omit<TaskConfig, 'id'>
+  ): Promise<TaskConfig | null> => {
     const newConfig = await surrealDbService.createTaskConfig(taskConfig);
     if (newConfig) {
       await refreshTaskConfigs();
@@ -93,8 +108,14 @@ export const DatabaseProvider: React.FC<DatabaseProviderProps> = ({ children }) 
   };
 
   // Update an existing task config
-  const updateTaskConfig = async (id: string, taskConfig: Partial<TaskConfig>): Promise<TaskConfig | null> => {
-    const updatedConfig = await surrealDbService.updateTaskConfig(id, taskConfig);
+  const updateTaskConfig = async (
+    id: string,
+    taskConfig: Partial<TaskConfig>
+  ): Promise<TaskConfig | null> => {
+    const updatedConfig = await surrealDbService.updateTaskConfig(
+      id,
+      taskConfig
+    );
     if (updatedConfig) {
       await refreshTaskConfigs();
     }

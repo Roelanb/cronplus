@@ -45,9 +45,7 @@ export default function AppProvider({
               <ReactQueryDevtools />
               <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
                 <SidebarProvider>
-                  <DatabaseProvider>
-                    {children}
-                  </DatabaseProvider>
+                  <DatabaseProvider>{children}</DatabaseProvider>
                 </SidebarProvider>
               </ThemeProvider>
             </QueryClientProvider>

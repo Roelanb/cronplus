@@ -27,7 +27,9 @@ interface SurrealRecord {
 /**
  * Convert RecordId to string
  */
-const extractId = (id: RecordId<string> | string | undefined): string | undefined => {
+const extractId = (
+  id: RecordId<string> | string | undefined
+): string | undefined => {
   if (!id) return undefined;
   if (typeof id === 'string') return id;
   // RecordId to string conversion
@@ -38,7 +40,10 @@ const extractId = (id: RecordId<string> | string | undefined): string | undefine
 /**
  * Map SurrealDB record to TaskConfig
  */
-const mapToTaskConfig = (record: SurrealRecord, fallbackId?: string): TaskConfig => {
+const mapToTaskConfig = (
+  record: SurrealRecord,
+  fallbackId?: string
+): TaskConfig => {
   return {
     id: extractId(record.id) || fallbackId,
     triggerType: record.triggerType as TaskConfig['triggerType'],
@@ -64,16 +69,16 @@ const surrealDbService = {
     try {
       // Connect to the SurrealDB server
       await db.connect(DB_URL);
-      
+
       // Sign in to the database
       await db.signin({
         username: DB_USERNAME,
-        password: DB_PASSWORD,
+        password: DB_PASSWORD
       });
-      
+
       // Select the namespace and database with correct parameter format
       await db.use({ namespace: DB_NAMESPACE, database: DB_DATABASE });
-      
+
       console.log('Successfully connected to SurrealDB');
     } catch (error) {
       console.error('Failed to connect to SurrealDB:', error);
@@ -107,7 +112,7 @@ const surrealDbService = {
       if (!result || !Array.isArray(result) || result.length === 0) {
         return null;
       }
-      
+
       const record = result[0] as unknown as SurrealRecord;
       return mapToTaskConfig(record, id);
     } catch (error) {
@@ -119,16 +124,20 @@ const surrealDbService = {
   /**
    * Create a new task config
    */
-  createTaskConfig: async (taskConfig: Omit<TaskConfig, 'id'>): Promise<TaskConfig | null> => {
+  createTaskConfig: async (
+    taskConfig: Omit<TaskConfig, 'id'>
+  ): Promise<TaskConfig | null> => {
     try {
       console.log('Creating task config:', taskConfig);
       const result = await db.create('taskconfig', taskConfig);
-      
+
       if (!result || !Array.isArray(result) || result.length === 0) {
-        console.error('Failed to create task: No result returned from database');
+        console.error(
+          'Failed to create task: No result returned from database'
+        );
         return null;
       }
-      
+
       const record = result[0] as unknown as SurrealRecord;
       const newTask = mapToTaskConfig(record);
       console.log('Task created successfully:', newTask);
@@ -142,7 +151,10 @@ const surrealDbService = {
   /**
    * Update an existing task config
    */
-  updateTaskConfig: async (id: string, taskConfig: Partial<TaskConfig>): Promise<TaskConfig | null> => {
+  updateTaskConfig: async (
+    id: string,
+    taskConfig: Partial<TaskConfig>
+  ): Promise<TaskConfig | null> => {
     try {
       console.log(`Updating task ${id} with:`, taskConfig);
       // Build SET clause from provided fields
@@ -150,7 +162,10 @@ const surrealDbService = {
         .map(([key]) => `${key} = $${key}`)
         .join(', ');
       const sql = `UPDATE taskconfig:${id} SET ${setClause} RETURN AFTER;`;
-      const queryResult = await db.query(sql, taskConfig as Record<string, unknown>);
+      const queryResult = await db.query(
+        sql,
+        taskConfig as Record<string, unknown>
+      );
 
       console.log('Update result:', queryResult);
 
