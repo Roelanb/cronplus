@@ -1,6 +1,7 @@
 'use client';
 import DashboardNav from '@/components/shared/dashboard-nav';
 import { navItems } from '@/constants/data';
+import { APP_VERSION } from '@/constants/version';
 import { useSidebar } from '@/hooks/use-sidebar';
 import { cn } from '@/lib/utils';
 import { ChevronsLeft } from 'lucide-react';
@@ -50,6 +51,12 @@ export default function Sidebar({ className }: SidebarProps) {
           </div>
         </div>
       </div>
+      {/* App Version - only show when sidebar is not minimized */}
+      {!isMinimized && (
+        <div className="absolute bottom-3 left-0 w-full text-center text-xs text-gray-400 select-none">
+          v{APP_VERSION}
+        </div>
+      )}
     </nav>
   );
 }

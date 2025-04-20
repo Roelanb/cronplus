@@ -11,7 +11,6 @@ using PdfSharp.Pdf.IO;
 using CronPlus.Tasks;
 using CronPlus.Storage;
 using CronPlus.Models;
-using CronPlus.Storage;
 #if WINDOWS
 using System.Drawing;
 using System.Drawing.Printing;
@@ -21,9 +20,13 @@ namespace CronPlus;
 
 class Program
 {
+    public const string Version = "1.0.0";
+
     static async Task Main(string[] args)
     {
+        Console.WriteLine($"CronPlus Backend Service v{Version}");
         var dataStore = new DataStore();
+        
         var configs = await LoadConfig(dataStore);
         var validConfigs = new List<TaskConfig>();
         var validationResults = new Dictionary<TaskConfig, List<string>>();
@@ -34,7 +37,7 @@ class Program
             validationResults[config] = errors;
             if (errors.Count > 0)
             {
-                Console.WriteLine($"Invalid TaskConfig for directory '{config.Directory}':");
+                Console.WriteLine($"Invalid TaskConfig for source folder '{config.sourceFolder}':");
                 foreach (var error in errors)
                     Console.WriteLine("  - " + error);
                 continue;
@@ -44,31 +47,31 @@ class Program
         
         ConsoleDumper.DumpTaskConfigsWithValidity(configs, validationResults);
         
-        // Group configs by directory for file system triggers
-        var directoryConfigs = new Dictionary<string, List<TaskConfig>>();
+        // Group configs by source folder for file system triggers
+        var sourceFolderConfigs = new Dictionary<string, List<TaskConfig>>();
         
         foreach (var config in validConfigs)
         {
             // Handle file system triggers (file created or renamed)
-            if (config.TriggerType == TriggerType.FileCreated || config.TriggerType == TriggerType.FileRenamed)
+            if (config.triggerType == TriggerType.FileCreated || config.triggerType == TriggerType.FileRenamed)
             {
-                if (!directoryConfigs.ContainsKey(config.Directory))
+                if (!sourceFolderConfigs.ContainsKey(config.sourceFolder))
                 {
-                    directoryConfigs[config.Directory] = new List<TaskConfig>();
+                    sourceFolderConfigs[config.sourceFolder] = new List<TaskConfig>();
                 }
                 
-                directoryConfigs[config.Directory].Add(config);
+                sourceFolderConfigs[config.sourceFolder].Add(config);
             }
             // Add other trigger types here when implemented
         }
 
-        // Create file system triggers for each directory
-        foreach (var entry in directoryConfigs)
+        // Create file system triggers for each source folder
+        foreach (var entry in sourceFolderConfigs)
         {
-            var directory = entry.Key;
+            var sourceFolder = entry.Key;
             var dirConfigs = entry.Value;
             
-            var fileSystemTrigger = new FileSystemTaskTrigger(directory, dirConfigs, dataStore);
+            var fileSystemTrigger = new FileSystemTaskTrigger(sourceFolder, dirConfigs, dataStore);
             fileSystemTrigger.Start();
         }
 

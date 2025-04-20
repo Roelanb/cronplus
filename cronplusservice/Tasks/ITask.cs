@@ -1,4 +1,6 @@
 using System;
+using System.Threading.Tasks;
+using CronPlus.Storage;
 
 namespace CronPlus.Tasks;
 
@@ -11,5 +13,6 @@ public interface ITask
     /// Execute the task on the given file path
     /// </summary>
     /// <param name="filePath">The path to the file that triggered the task</param>
-    void Execute(string filePath);
+    /// <param name="dataStore">The data store for logging and configuration</param>
+    Task Execute(string filePath, DataStore dataStore);
 }

@@ -8,7 +8,8 @@ export enum TriggerType {
 export interface TaskConfig {
   id?: string;
   triggerType: TriggerType;
-  directory: string;
+  sourceFolder: string;
+  destinationFolder: string;
   taskType: string;
   sourceFile?: string;
   destinationFile?: string;
@@ -16,4 +17,6 @@ export interface TaskConfig {
   interval?: number;
   printerName?: string;
   archiveDirectory?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }

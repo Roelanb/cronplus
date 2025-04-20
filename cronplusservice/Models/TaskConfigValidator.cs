@@ -12,14 +12,14 @@ public static class TaskConfigValidator
     public static List<string> Validate(TaskConfig config)
     {
         var errors = new List<string>();
-        // Directory exists
-        if (string.IsNullOrWhiteSpace(config.Directory) || !Directory.Exists(config.Directory))
-            errors.Add($"Directory does not exist: {config.Directory}");
+        // SourceFolder exists
+        if (string.IsNullOrWhiteSpace(config.sourceFolder) || !Directory.Exists(config.sourceFolder))
+            errors.Add($"Source folder does not exist: {config.sourceFolder}");
 
         // Archive directory's parent exists
-        if (!string.IsNullOrWhiteSpace(config.ArchiveDirectory))
+        if (!string.IsNullOrWhiteSpace(config.archiveDirectory))
         {
-            var parent = Path.GetDirectoryName(config.ArchiveDirectory);
+            var parent = Path.GetDirectoryName(config.archiveDirectory);
             if (string.IsNullOrWhiteSpace(parent) || !Directory.Exists(parent))
                 errors.Add($"Archive directory parent does not exist: {parent}");
         }
@@ -44,14 +44,14 @@ public static class TaskConfigValidator
         #endif
 
         // TriggerType-specific checks
-        switch (config.TriggerType)
+        switch (config.triggerType)
         {
             case TriggerType.Time:
-                if (string.IsNullOrWhiteSpace(config.Time))
+                if (string.IsNullOrWhiteSpace(config.time))
                     errors.Add("Time must be set for TriggerType.Time");
                 break;
             case TriggerType.Interval:
-                if (config.Interval <= 0)
+                if (config.interval <= 0)
                     errors.Add("Interval must be positive for TriggerType.Interval");
                 break;
         }

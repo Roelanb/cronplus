@@ -17,12 +17,12 @@ public static class TaskFactory
     {
         ArgumentNullException.ThrowIfNull(config);
 
-        return config.TaskType.ToLower() switch
+        return config.taskType.ToLower() switch
         {
             "print" => new PrintTask(config),
             "copy" => new CopyTask(config),
             "move" => new MoveTask(config),
-            _ => throw new ArgumentException($"Unknown task type: {config.TaskType}", nameof(config.TaskType)),
+            _ => throw new ArgumentException($"Unknown task type: {config.taskType}", nameof(config.taskType)),
         };
     }
 }

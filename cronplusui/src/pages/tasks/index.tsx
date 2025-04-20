@@ -9,11 +9,20 @@ import {
 import PageHead from '@/components/shared/page-head';
 import { useDatabase } from '@/hooks/use-database';
 import { TriggerType, TaskConfig } from '@/types/taskConfig';
-import { PlusIcon, FileEditIcon, TrashIcon } from 'lucide-react';
+import { PlusIcon, FileEditIcon, TrashIcon, GridIcon, ListIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { TaskForm } from '@/components/forms/task-form';
 import { DeleteTaskDialog } from '@/components/modals/delete-task-dialog';
 import { useState } from 'react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from '@/components/ui/table';
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export default function TasksPage() {
   const { taskConfigs, isLoading, error, refreshTaskConfigs } = useDatabase();
@@ -25,6 +34,8 @@ export default function TasksPage() {
   const [selectedTask, setSelectedTask] = useState<TaskConfig | undefined>(
     undefined
   );
+  // Add state for view mode
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const handleCreateTask = () => {
     setIsCreateDialogOpen(true);
@@ -92,13 +103,23 @@ export default function TasksPage() {
       <div className="max-h-screen flex-1 space-y-4 overflow-y-auto p-4 pt-6 md:p-8">
         <div className="flex items-center justify-between space-y-2">
           <h2 className="text-3xl font-bold tracking-tight">Tasks</h2>
-          <Button
-            onClick={handleCreateTask}
-            className="flex items-center gap-2"
-          >
-            <PlusIcon className="size-4" />
-            Create Task
-          </Button>
+          <div className="flex items-center gap-4">
+            <ToggleGroup type="single" value={viewMode} onValueChange={(value) => value && setViewMode(value as 'grid' | 'list')}>
+              <ToggleGroupItem value="grid" aria-label="Grid view">
+                <GridIcon className="size-4" />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="list" aria-label="List view">
+                <ListIcon className="size-4" />
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <Button
+              onClick={handleCreateTask}
+              className="flex items-center gap-2"
+            >
+              <PlusIcon className="size-4" />
+              Create Task
+            </Button>
+          </div>
         </div>
 
         {error && (
@@ -122,92 +143,150 @@ export default function TasksPage() {
         )}
 
         {isLoading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map((i) => (
-              <Card key={i} className="animate-pulse">
-                <CardHeader className="pb-2">
-                  <div className="h-6 w-3/4 rounded-md bg-muted"></div>
-                  <div className="h-4 w-1/2 rounded-md bg-muted"></div>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-20 rounded-md bg-muted"></div>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="flex items-center justify-center p-8">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
           </div>
-        ) : taskConfigs.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {taskConfigs.map((task) => (
-              <Card key={task.id} className="transition-shadow hover:shadow-md">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <Badge className={getTaskTypeBadge(task.taskType)}>
-                      {task.taskType}
-                    </Badge>
-                    <Badge variant="outline">
-                      {getTriggerTypeLabel(task.triggerType)}
-                    </Badge>
-                  </div>
-                  <CardDescription className="mt-2">
-                    ID: {task.id || 'New Task'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="mb-4 space-y-2">
-                    <p>
-                      <span className="font-medium">Directory:</span>{' '}
-                      {task.directory}
-                    </p>
-                    {renderTimingInfo(task)}
-                    {task.sourceFile && (
+        ) : taskConfigs && taskConfigs.length > 0 ? (
+          viewMode === 'grid' ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {taskConfigs.map((task) => (
+                <Card key={task.id} className="transition-shadow hover:shadow-md">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <Badge className={getTaskTypeBadge(task.taskType)}>
+                        {task.taskType}
+                      </Badge>
+                      <Badge variant="outline">
+                        {getTriggerTypeLabel(task.triggerType)}
+                      </Badge>
+                    </div>
+                    <CardDescription className="mt-2">
+                      ID: {task.id || 'New Task'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="mb-4 space-y-2">
                       <p>
-                        <span className="font-medium">Source:</span>{' '}
-                        {task.sourceFile}
+                        <span className="font-medium">Source Folder:</span>{' '}
+                        {task.sourceFolder}
                       </p>
-                    )}
-                    {task.destinationFile && (
                       <p>
-                        <span className="font-medium">Destination:</span>{' '}
-                        {task.destinationFile}
+                        <span className="font-medium">Destination Folder:</span>{' '}
+                        {task.destinationFolder}
                       </p>
-                    )}
-                    {task.printerName && (
-                      <p>
-                        <span className="font-medium">Printer:</span>{' '}
-                        {task.printerName}
-                      </p>
-                    )}
-                    {task.archiveDirectory && (
-                      <p>
-                        <span className="font-medium">Archive:</span>{' '}
-                        {task.archiveDirectory}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex items-center gap-1"
-                      onClick={() => handleEditTask(task)}
-                    >
-                      <FileEditIcon className="size-4" />
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex items-center gap-1 text-red-600 hover:bg-red-50 hover:text-red-700"
-                      onClick={() => handleDeleteTask(task)}
-                    >
-                      <TrashIcon className="size-4" />
-                      Delete
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                      {renderTimingInfo(task)}
+                      {task.sourceFile && (
+                        <p>
+                          <span className="font-medium">Source:</span>{' '}
+                          {task.sourceFile}
+                        </p>
+                      )}
+                      {task.destinationFile && (
+                        <p>
+                          <span className="font-medium">Destination:</span>{' '}
+                          {task.destinationFile}
+                        </p>
+                      )}
+                      {task.printerName && (
+                        <p>
+                          <span className="font-medium">Printer:</span>{' '}
+                          {task.printerName}
+                        </p>
+                      )}
+                      {task.archiveDirectory && (
+                        <p>
+                          <span className="font-medium">Archive:</span>{' '}
+                          {task.archiveDirectory}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex items-center gap-1"
+                        onClick={() => handleEditTask(task)}
+                      >
+                        <FileEditIcon className="size-4" />
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex items-center gap-1 text-red-600 hover:bg-red-50 hover:text-red-700"
+                        onClick={() => handleDeleteTask(task)}
+                      >
+                        <TrashIcon className="size-4" />
+                        Delete
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Trigger</TableHead>
+                    <TableHead>Source Folder</TableHead>
+                    <TableHead>Destination Folder</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {taskConfigs.map((task) => (
+                    <TableRow key={task.id}>
+                      <TableCell>
+                        <Badge className={getTaskTypeBadge(task.taskType)}>
+                          {task.taskType}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {getTriggerTypeLabel(task.triggerType)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate" title={task.sourceFolder}>
+                        {task.sourceFolder}
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate" title={task.destinationFolder}>
+                        {task.destinationFolder}
+                      </TableCell>
+                      <TableCell>
+                        {task.createdAt ? new Date(task.createdAt).toLocaleDateString() : 'N/A'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="flex h-8 w-8 p-0"
+                            onClick={() => handleEditTask(task)}
+                            aria-label="Edit task"
+                          >
+                            <FileEditIcon className="size-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="flex h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-700"
+                            onClick={() => handleDeleteTask(task)}
+                            aria-label="Delete task"
+                          >
+                            <TrashIcon className="size-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+          )
         ) : (
           <Card>
             <CardHeader className="pb-2">

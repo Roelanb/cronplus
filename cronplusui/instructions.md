@@ -11,6 +11,12 @@ can you use the mcpbrowser tool to update a record.
 
 can you use the mcpbrowser tool to delete a record.
 
+add a field called DestinationFolder to the TaskConfig model, and rename the Directory field to SourceFolder.
+
+Update the Tasks page so I can also see the tasks as a list.
+
+can you make the task execution logs table more flexible. I want to be able to hide or show columns.
+
 load the TaskConfig records from the database, namespace = cronplus, database = cronplus
 Use the root username, password = root
 The model of the taskconfig records look like this:

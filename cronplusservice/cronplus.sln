@@ -4,7 +4,7 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "cronplus", "cronplus.csproj", "{8B3525F3-C795-4B34-D1ED-E3E815234A81}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "cronplusapp", "..\cronplusapp\cronplusapp.csproj", "{8E3BD3EF-53BA-4D21-874B-FC99949162B0}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CronPlus.Tests", "..\CronPlus.Tests\CronPlus.Tests.csproj", "{CA2847E0-1885-4140-B942-D361664088B0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -16,10 +16,10 @@ Global
 		{8B3525F3-C795-4B34-D1ED-E3E815234A81}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8B3525F3-C795-4B34-D1ED-E3E815234A81}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8B3525F3-C795-4B34-D1ED-E3E815234A81}.Release|Any CPU.Build.0 = Release|Any CPU
-		{8E3BD3EF-53BA-4D21-874B-FC99949162B0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{8E3BD3EF-53BA-4D21-874B-FC99949162B0}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{8E3BD3EF-53BA-4D21-874B-FC99949162B0}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{8E3BD3EF-53BA-4D21-874B-FC99949162B0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CA2847E0-1885-4140-B942-D361664088B0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CA2847E0-1885-4140-B942-D361664088B0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CA2847E0-1885-4140-B942-D361664088B0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CA2847E0-1885-4140-B942-D361664088B0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

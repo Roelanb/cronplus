@@ -8,6 +8,7 @@ const DashboardLayout = lazy(
 );
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 const TasksPage = lazy(() => import('@/pages/tasks'));
+const TaskLogsPage = lazy(() => import('@/pages/task-logs'));
 const OneTimeTasksPage = lazy(() => import('@/pages/one-time-tasks'));
 
 // ----------------------------------------------------------------------
@@ -31,6 +32,10 @@ export default function AppRouter() {
         {
           path: 'tasks',
           element: <TasksPage />
+        },
+        {
+          path: 'task-logs',
+          element: <TaskLogsPage />
         },
         {
           path: 'one-time-tasks',

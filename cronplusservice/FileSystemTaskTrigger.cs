@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using CronPlus.Models;
 using CronPlus.Tasks;
 using CronPlus.Storage;
@@ -10,16 +12,16 @@ namespace CronPlus;
 /// <summary>
 /// Monitors a directory for file system events and triggers tasks based on configuration
 /// </summary>
-public class FileSystemTaskTrigger
+public class FileSystemTaskTrigger : IDisposable
 {
     private readonly string _directory;
     private readonly List<TaskConfig> _configs;
     private readonly FileSystemWatcher _watcher;
-    private readonly DataStore _dataStore;
+    private readonly CronPlus.Storage.DataStore _dataStore;
 
-    public FileSystemTaskTrigger(string directory, List<TaskConfig> configs, DataStore dataStore)
+    public FileSystemTaskTrigger(string sourceFolder, List<TaskConfig> configs, CronPlus.Storage.DataStore dataStore)
     {
-        _directory = directory;
+        _directory = sourceFolder;
         _configs = configs ?? throw new ArgumentNullException(nameof(configs));
         _dataStore = dataStore ?? throw new ArgumentNullException(nameof(dataStore));
         _watcher = new FileSystemWatcher(_directory);
@@ -54,23 +56,24 @@ public class FileSystemTaskTrigger
     {
         foreach (var config in _configs)
         {
-            if (config.TriggerType == triggerType)
+            if (config.triggerType == triggerType)
             {
-                Console.WriteLine($"Executing task: {config.TaskType} for file: {filePath}");
+                Console.WriteLine($"Executing task: {config.taskType} for file: {filePath}");
                 var log = new TaskLogging {
-                    TaskType = config.TaskType,
-                    TriggerType = config.TriggerType,
-                    Directory = config.Directory,
+                    TaskType = config.taskType,
+                    TriggerType = config.triggerType,
+                    SourceFolder = config.sourceFolder,
+                    DestinationFolder = config.destinationFolder,
                     FilePath = filePath,
-                    PrinterName = config.PrinterName,
-                    ArchiveDirectory = config.ArchiveDirectory,
+                    PrinterName = config.printerName,
+                    ArchiveDirectory = config.archiveDirectory,
                     TriggeredAt = DateTime.UtcNow
                 };
                 try
                 {
                     // Use the factory to create an appropriate task instance
                     ITask task = Tasks.TaskFactory.CreateTask(config);
-                    task.Execute(filePath);
+                    await task.Execute(filePath, _dataStore);
                     log.Result = "Success";
                 }
                 catch (ArgumentException ex)
@@ -78,9 +81,13 @@ public class FileSystemTaskTrigger
                     Console.WriteLine(ex.Message);
                     log.Result = $"Failure: {ex.Message}";
                 }
-                await _dataStore.LogTaskAsync(log);
+                await _dataStore.SaveTaskLog(log);
             }
         }
     }
 
+    public void Dispose()
+    {
+        _watcher.Dispose();
+    }
 }

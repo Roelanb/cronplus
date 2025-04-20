@@ -33,7 +33,8 @@ import { TaskConfig, TriggerType } from '@/types/taskConfig';
 
 const taskFormSchema = z.object({
   triggerType: z.nativeEnum(TriggerType),
-  directory: z.string().min(1, 'Directory is required'),
+  sourceFolder: z.string().min(1, 'Source folder is required'),
+  destinationFolder: z.string().min(1, 'Destination folder is required'),
   taskType: z.string().min(1, 'Task type is required'),
   sourceFile: z.string().optional(),
   destinationFile: z.string().optional(),
@@ -67,7 +68,8 @@ export function TaskForm({
     resolver: zodResolver(taskFormSchema),
     defaultValues: {
       triggerType: initialData?.triggerType || TriggerType.FileCreated,
-      directory: initialData?.directory || '',
+      sourceFolder: initialData?.sourceFolder || '',
+      destinationFolder: initialData?.destinationFolder || '',
       taskType: initialData?.taskType || '',
       sourceFile: initialData?.sourceFile || '',
       destinationFile: initialData?.destinationFile || '',
@@ -83,7 +85,8 @@ export function TaskForm({
     if (initialData) {
       form.reset({
         triggerType: initialData.triggerType,
-        directory: initialData.directory,
+        sourceFolder: initialData.sourceFolder,
+        destinationFolder: initialData.destinationFolder,
         taskType: initialData.taskType,
         sourceFile: initialData.sourceFile || '',
         destinationFile: initialData.destinationFile || '',
@@ -95,7 +98,8 @@ export function TaskForm({
     } else {
       form.reset({
         triggerType: TriggerType.FileCreated,
-        directory: '',
+        sourceFolder: '',
+        destinationFolder: '',
         taskType: '',
         sourceFile: '',
         destinationFile: '',
@@ -235,14 +239,32 @@ export function TaskForm({
 
             <FormField
               control={form.control}
-              name="directory"
+              name="sourceFolder"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Directory</FormLabel>
+                  <FormLabel>Source Folder</FormLabel>
                   <FormControl>
                     <Input
                       disabled={isSubmitting}
-                      placeholder="/path/to/directory"
+                      placeholder="/path/to/source/folder"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="destinationFolder"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Destination Folder</FormLabel>
+                  <FormControl>
+                    <Input
+                      disabled={isSubmitting}
+                      placeholder="/path/to/destination/folder"
                       {...field}
                     />
                   </FormControl>

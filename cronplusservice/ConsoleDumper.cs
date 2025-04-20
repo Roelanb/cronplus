@@ -9,7 +9,8 @@ public static class ConsoleDumper
     public static void DumpTaskConfigsWithValidity(IEnumerable<TaskConfig> configs, Dictionary<TaskConfig, List<string>> validationResults)
     {
         var table = new ConsoleTable(
-            "Directory",
+            "SourceFolder",
+            "DestinationFolder",
             "TaskType",
             "TriggerType",
             "PrinterName",
@@ -23,11 +24,12 @@ public static class ConsoleDumper
             validationResults.TryGetValue(config, out var errors);
             var isValid = errors == null || errors.Count == 0;
             table.AddRow(
-                config.Directory,
-                config.TaskType,
-                config.TriggerType,
-                config.PrinterName ?? "-",
-                config.ArchiveDirectory ?? "-",
+                config.sourceFolder,
+                config.destinationFolder,
+                config.taskType,
+                config.triggerType,
+                config.printerName ?? "-",
+                config.archiveDirectory ?? "-",
                 isValid ? "Yes" : "No",
                 isValid ? "-" : string.Join("; ", errors?.Where(e => !string.IsNullOrWhiteSpace(e)) ?? Array.Empty<string>())
             );

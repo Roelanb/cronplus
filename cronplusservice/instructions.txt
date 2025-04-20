@@ -35,3 +35,10 @@ When printing a PDF in windows, the code uses the print command to print the fil
 
  add a static helper class to dump information to the console. Output the list of configs and their validity into a table.
  use https://github.com/khalidabuhakmeh/ConsoleTables
+
+ In the cronplusservice app, the TaskConfig model is CamelCase, but the data is stored as lowerCamelCase in SurrealDB. Update the model to lowerCamelCase.
+
+ Build a helperclass for filename functions.
+ The DestinationFile can use wildcards. In both parts of the filename (before and after the .)
+ Wildcards can be * of ?.
+ Add a function that translates the source filename to the destination filename, using the wildcards

@@ -8,6 +8,12 @@ export const navItems: NavItem[] = [
     label: 'Tasks'
   },
   {
+    title: 'Task Logs',
+    href: '/task-logs',
+    icon: 'settings',
+    label: 'Task Logs'
+  },
+  {
     title: 'One-time Tasks',
     href: '/one-time-tasks',
     icon: 'timer',
