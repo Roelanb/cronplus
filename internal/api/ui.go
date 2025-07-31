@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"html/template"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -52,7 +53,9 @@ a.nav:hover { text-decoration: underline; }
   {{ template "content" . }}
 </main>
 <footer>
-  <div class="container">Cronplus UI</div>
+  <div class="container">
+    Cronplus UI — Backend v{{.BackendVersion}} — Frontend v{{.FrontendVersion}}
+  </div>
 </footer>
 <script>
 async function api(path, opts) {
@@ -465,8 +468,10 @@ func (s *Server) mountUI() {
 	// Dashboard
 	s.mux.HandleFunc("/ui", func(w http.ResponseWriter, r *http.Request) {
 		type dashboardData struct {
-			Healthy bool
-			Tasks   any
+			Healthy         bool
+			Tasks           any
+			BackendVersion  string
+			FrontendVersion string
 		}
 		// compute health using internal handler
 		healthy := true
@@ -476,7 +481,9 @@ func (s *Server) mountUI() {
 			healthy = false
 		}
 		data := dashboardData{
-			Healthy: healthy,
+			Healthy:         healthy,
+			BackendVersion:  versionFromBuild(),
+			FrontendVersion: frontendVersion(),
 		}
 		if s.ctrl != nil {
 			data.Tasks = s.ctrl.TasksSnapshot()
@@ -501,7 +508,9 @@ func (s *Server) mountUI() {
 			}
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			_ = configTpl.ExecuteTemplate(w, "base", map[string]any{
-				"ConfigJSON": strings.TrimSpace(js),
+				"ConfigJSON":      strings.TrimSpace(js),
+				"BackendVersion":  versionFromBuild(),
+				"FrontendVersion": frontendVersion(),
 			})
 		default:
 			http.NotFound(w, r)
@@ -511,14 +520,20 @@ func (s *Server) mountUI() {
 	// Tasks list
 	s.mux.HandleFunc("/ui/tasks", func(w http.ResponseWriter, r *http.Request) {
 		type data struct {
-			Tasks any
+			Tasks           any
+			BackendVersion  string
+			FrontendVersion string
 		}
 		var tasks any
 		if s.ctrl != nil {
 			tasks = s.ctrl.TasksSnapshot()
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = tasksTpl.ExecuteTemplate(w, "base", data{Tasks: tasks})
+		_ = tasksTpl.ExecuteTemplate(w, "base", data{
+			Tasks:           tasks,
+			BackendVersion:  versionFromBuild(),
+			FrontendVersion: frontendVersion(),
+		})
 	})
 
 	// Task editor (new/edit)
@@ -541,7 +556,13 @@ func (s *Server) mountUI() {
 		d.Mode = "New"
 		d.PipelineJSON = template.JS("[]")
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = taskFormTpl.ExecuteTemplate(w, "base", d)
+		_ = taskFormTpl.ExecuteTemplate(w, "base", map[string]any{
+			"Mode":            d.Mode,
+			"Task":            d.Task,
+			"PipelineJSON":    d.PipelineJSON,
+			"BackendVersion":  versionFromBuild(),
+			"FrontendVersion": frontendVersion(),
+		})
 	})
 	s.mux.HandleFunc("/ui/task/edit", func(w http.ResponseWriter, r *http.Request) {
 		type taskEdit struct {
@@ -618,7 +639,13 @@ func (s *Server) mountUI() {
 		}
 		d.PipelineJSON = template.JS(js)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = taskFormTpl.ExecuteTemplate(w, "base", d)
+		_ = taskFormTpl.ExecuteTemplate(w, "base", map[string]any{
+			"Mode":            d.Mode,
+			"Task":            d.Task,
+			"PipelineJSON":    d.PipelineJSON,
+			"BackendVersion":  versionFromBuild(),
+			"FrontendVersion": frontendVersion(),
+		})
 	})
 }
 
@@ -634,4 +661,24 @@ func (rr *responseRecorder) WriteHeader(statusCode int) { rr.status = statusCode
 func (rr *responseRecorder) Write(b []byte) (int, error) {
 	rr.body = append(rr.body, b...)
 	return len(b), nil
+}
+
+// versionFromBuild returns backend version injected by linker or "dev".
+func versionFromBuild() string {
+	// Backend version is provided via template data from handlers (see mountUI).
+	// We keep this function for template compatibility.
+	return ""
+}
+
+// frontendVersion reads persisted version/version.frontend file.
+func frontendVersion() string {
+	// Prefer file under version/frontend.version
+	b, err := os.ReadFile("version/frontend.version")
+	if err == nil {
+		s := strings.TrimSpace(string(b))
+		if s != "" {
+			return s
+		}
+	}
+	return "0.0.0"
 }

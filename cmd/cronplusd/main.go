@@ -22,6 +22,9 @@ var (
 	apiAddr    = flag.String("api-addr", "127.0.0.1:8080", "Control API listen address")
 )
 
+// // Backend version injected at build time with: -ldflags "-X 'main.version=1.2.3'"
+var version = "dev"
+
 type controlPlane struct {
 	logger  loggerIface
 	manager *task.Manager
