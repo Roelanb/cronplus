@@ -36,7 +36,7 @@
     },
     {
       "id": "copy-and-delete-1",
-      "enabled": true,
+      "enabled": false,
       "watch": {
         "directory": "/tmp/cronplus/source",
         "glob": "*",

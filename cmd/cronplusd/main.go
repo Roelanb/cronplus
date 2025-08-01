@@ -14,6 +14,7 @@ import (
 	"github.com/Roelanb/cronplus/internal/config"
 	"github.com/Roelanb/cronplus/internal/observability"
 	"github.com/Roelanb/cronplus/internal/task"
+	zap "go.uber.org/zap"
 )
 
 var (
@@ -30,6 +31,9 @@ type controlPlane struct {
 	manager *task.Manager
 	cfgPath string
 	cfg     *config.Config
+
+	// add concrete logger so we can pass it into config.Load/Parse
+	sugar *zap.SugaredLogger
 }
 
 func (c *controlPlane) TasksSnapshot() any {
@@ -43,12 +47,14 @@ type loggerIface interface {
 	Infow(string, ...any)
 	Errorw(string, ...any)
 	Debugw(string, ...any)
+	Warn(...any)
+	Warnw(string, ...any)
 	Sync() error
 }
 
 func (c *controlPlane) Reload(ctx context.Context) error {
 	// Reload from disk path (legacy support)
-	cfg, err := config.Load(c.cfgPath)
+	cfg, err := config.Load(c.cfgPath, c.sugar)
 	if err != nil {
 		return err
 	}
@@ -59,7 +65,7 @@ func (c *controlPlane) Reload(ctx context.Context) error {
 func (c *controlPlane) GetConfig() any {
 	if c.cfg == nil {
 		// best-effort load from file path if not set yet
-		if cfg, err := config.Load(c.cfgPath); err == nil {
+		if cfg, err := config.Load(c.cfgPath, c.sugar); err == nil {
 			c.cfg = cfg
 		}
 	}
@@ -67,7 +73,7 @@ func (c *controlPlane) GetConfig() any {
 }
 
 func (c *controlPlane) ApplyConfig(ctx context.Context, raw []byte) error {
-	cfg, err := config.Parse(raw)
+	cfg, err := config.Parse(raw, c.sugar)
 	if err != nil {
 		return err
 	}
@@ -86,7 +92,7 @@ func main() {
 	defer logger.Sync() //nolint:errcheck
 
 	// Load initial config
-	cfg, err := config.Load(*configPath)
+	cfg, err := config.Load(*configPath, logger)
 	if err != nil {
 		logger.Errorw("failed to load config", "path", *configPath, "error", err)
 		fmt.Fprintf(os.Stderr, "Config error: %v\n", err)
@@ -123,7 +129,7 @@ func main() {
 	logger.Infow("task supervisors started")
 
 	// Control API
-	ctrl := &controlPlane{logger: logger, manager: manager, cfgPath: *configPath, cfg: cfg}
+	ctrl := &controlPlane{logger: logger, manager: manager, cfgPath: *configPath, cfg: cfg, sugar: logger}
 	apiSrv := api.New(logger, ctrl, *apiAddr)
 	if err := apiSrv.Start(ctx); err != nil {
 		logger.Errorw("failed to start api server", "addr", *apiAddr, "error", err)

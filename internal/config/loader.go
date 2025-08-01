@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"go.uber.org/zap"
 )
 
-func Load(path string) (*Config, error) {
+func Load(path string, logger *zap.SugaredLogger) (*Config, error) {
 	if path == "" {
 		return nil, errors.New("config path is empty")
 	}
@@ -23,20 +25,23 @@ func Load(path string) (*Config, error) {
 	}
 
 	applyDefaults(&cfg)
-	if err := Validate(&cfg); err != nil {
+
+	// Validate config; if errors are only in tasks, disable invalid tasks and warn.
+	// If there are global errors (version/runtime), still return error.
+	if err := validateLenient(&cfg, logger); err != nil {
 		return nil, err
 	}
 	return &cfg, nil
 }
 
 // Parse parses a raw JSON config into Config, applies defaults and validates.
-func Parse(raw []byte) (*Config, error) {
+func Parse(raw []byte, logger *zap.SugaredLogger) (*Config, error) {
 	var cfg Config
 	if err := json.Unmarshal(raw, &cfg); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 	applyDefaults(&cfg)
-	if err := Validate(&cfg); err != nil {
+	if err := validateLenient(&cfg, logger); err != nil {
 		return nil, err
 	}
 	return &cfg, nil
@@ -252,5 +257,165 @@ func Validate(cfg *Config) error {
 	if cfg.Runtime.DeadLetterDir != "" && !filepath.IsAbs(cfg.Runtime.DeadLetterDir) {
 		return errors.New("runtime.deadLetterDir must be absolute if set")
 	}
+	return nil
+}
+
+// validateLenient validates global config strictly, but handles per-task validation leniently:
+// - If a task is invalid, it is disabled (Enabled=false) and a warning is logged.
+// - The application still starts as long as global config is valid.
+// - If all tasks end up disabled/invalid, we still allow startup but log a warning.
+func validateLenient(cfg *Config, logger *zap.SugaredLogger) error {
+	// Basic global checks aligned with Validate but without per-task strict errors.
+	if cfg.Version <= 0 {
+		return errors.New("version must be > 0")
+	}
+	if len(cfg.Tasks) == 0 {
+		// Keep strict here: completely empty config is likely misconfiguration.
+		return errors.New("at least one task must be defined")
+	}
+	// Runtime checks (strict)
+	if cfg.Runtime.MaxConcurrentPerTask <= 0 {
+		return errors.New("runtime.maxConcurrentPerTask must be >= 1")
+	}
+	if cfg.Runtime.StateDbPath != "" && !filepath.IsAbs(cfg.Runtime.StateDbPath) {
+		return errors.New("runtime.stateDbPath must be absolute if set")
+	}
+	if cfg.Runtime.DeadLetterDir != "" && !filepath.IsAbs(cfg.Runtime.DeadLetterDir) {
+		return errors.New("runtime.deadLetterDir must be absolute if set")
+	}
+
+	ids := map[string]struct{}{}
+	for i := range cfg.Tasks {
+		t := &cfg.Tasks[i]
+
+		// Track if we encountered any validation error for this task.
+		var taskErr error
+
+		// ID required and unique
+		if t.ID == "" {
+			taskErr = fmt.Errorf("tasks[%d]: id is required", i)
+		} else {
+			if _, ok := ids[t.ID]; ok {
+				taskErr = fmt.Errorf("tasks[%d]: duplicate id %q", i, t.ID)
+			} else {
+				ids[t.ID] = struct{}{}
+			}
+		}
+
+		// Watch validations
+		if taskErr == nil {
+			if t.Watch.Directory == "" {
+				taskErr = fmt.Errorf("tasks[%s]: watch.directory is required", t.ID)
+			} else if !filepath.IsAbs(t.Watch.Directory) {
+				taskErr = fmt.Errorf("tasks[%s]: watch.directory must be absolute", t.ID)
+			} else if t.Watch.DebounceMs < 0 {
+				taskErr = fmt.Errorf("tasks[%s]: watch.debounceMs must be >= 0", t.ID)
+			} else if t.Watch.StabilizationMs < 0 {
+				taskErr = fmt.Errorf("tasks[%s]: watch.stabilizationMs must be >= 0", t.ID)
+			}
+		}
+
+		// Pipeline validations
+		if taskErr == nil {
+			if len(t.Pipeline) == 0 {
+				taskErr = fmt.Errorf("tasks[%s]: pipeline must not be empty", t.ID)
+			} else {
+				for j := range t.Pipeline {
+					step := &t.Pipeline[j]
+					// Infer type if omitted
+					if step.Type == "" {
+						if step.Print != nil {
+							step.Type = "print"
+						} else if step.Archive != nil {
+							step.Type = "archive"
+						} else if step.Copy != nil {
+							step.Type = "copy"
+						} else if step.Delete != nil {
+							step.Type = "delete"
+						}
+					}
+
+					switch step.Type {
+					case "print":
+						if step.Print == nil {
+							taskErr = fmt.Errorf("tasks[%s].pipeline[%d]: print step missing details", t.ID, j)
+							break
+						}
+						if step.Print.PrinterName == "" {
+							taskErr = fmt.Errorf("tasks[%s].pipeline[%d]: printerName required", t.ID, j)
+							break
+						}
+						if step.Print.Copies <= 0 {
+							taskErr = fmt.Errorf("tasks[%s].pipeline[%d]: copies must be > 0", t.ID, j)
+							break
+						}
+						if step.Print.TimeoutSec <= 0 {
+							taskErr = fmt.Errorf("tasks[%s].pipeline[%d]: timeoutSec must be > 0", t.ID, j)
+							break
+						}
+					case "archive":
+						if step.Archive == nil {
+							taskErr = fmt.Errorf("tasks[%s].pipeline[%d]: archive step missing details", t.ID, j)
+							break
+						}
+						if step.Archive.Destination == "" {
+							taskErr = fmt.Errorf("tasks[%s].pipeline[%d]: archive.destination required", t.ID, j)
+							break
+						}
+						if !filepath.IsAbs(step.Archive.Destination) {
+							taskErr = fmt.Errorf("tasks[%s].pipeline[%d]: archive.destination must be absolute", t.ID, j)
+							break
+						}
+						switch step.Archive.ConflictStrategy {
+						case "rename", "overwrite", "skip":
+						default:
+							taskErr = fmt.Errorf("tasks[%s].pipeline[%d]: archive.conflictStrategy invalid", t.ID, j)
+						}
+					case "copy":
+						if step.Copy == nil {
+							taskErr = fmt.Errorf("tasks[%s].pipeline[%d]: copy step missing details", t.ID, j)
+							break
+						}
+						if step.Copy.Destination == "" {
+							taskErr = fmt.Errorf("tasks[%s].pipeline[%d]: copy.destination required", t.ID, j)
+							break
+						}
+						if !filepath.IsAbs(step.Copy.Destination) {
+							taskErr = fmt.Errorf("tasks[%s].pipeline[%d]: copy.destination must be absolute", t.ID, j)
+							break
+						}
+					case "delete":
+						// no additional required fields
+					default:
+						taskErr = fmt.Errorf("tasks[%s].pipeline[%d]: unsupported type %q", t.ID, j, step.Type)
+					}
+					if taskErr != nil {
+						break
+					}
+				}
+			}
+		}
+
+		if taskErr != nil {
+			// Disable the task and log a warning, continue startup.
+			if logger != nil {
+				logger.Warnw("Disabling invalid task", "taskID", t.ID, "error", taskErr.Error())
+			}
+			t.Enabled = false
+		}
+	}
+
+	// If all tasks are disabled, warn (but do not fail).
+	allDisabled := true
+	for i := range cfg.Tasks {
+		if cfg.Tasks[i].Enabled {
+			allDisabled = false
+			break
+		}
+	}
+	if allDisabled && logger != nil {
+		logger.Warn("All tasks are disabled after validation; application will start without active tasks")
+	}
+
 	return nil
 }

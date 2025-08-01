@@ -36,6 +36,9 @@ button.secondary { background: #374151; }
 .badge.no { background: #7f1d1d; color: #fee2e2; }
 a.nav { color: #93c5fd; text-decoration: none; margin-right: 12px; }
 a.nav:hover { text-decoration: underline; }
+.pathpicker { display:inline-block; margin-left:8px; }
+.pathpicker input[type="file"] { display:none; }
+.pathpicker .btn { background:#374151; }
 </style>
 </head>
 <body>
@@ -72,6 +75,96 @@ async function reloadConfig(ev) {
     alert('Reload failed: ' + e.message);
   }
 }
+function el(tag, attrs) {
+  var e = document.createElement(tag);
+  if (attrs) {
+    for (var k in attrs) {
+      if (!Object.prototype.hasOwnProperty.call(attrs, k)) continue;
+      var v = attrs[k];
+      if (k === 'class') e.className = v;
+      else if (k === 'for') e.htmlFor = v;
+      else e.setAttribute(k, v);
+    }
+  }
+  for (var i = 2; i < arguments.length; i++) {
+    var c = arguments[i];
+    if (c == null) continue;
+    if (typeof c === 'string') e.appendChild(document.createTextNode(c));
+    else e.appendChild(c);
+  }
+  return e;
+}
+function checkbox(id, checked) {
+  var input = el('input', { type: 'checkbox', id: id });
+  if (checked) input.setAttribute('checked', 'checked');
+  return input;
+}
+async function loadConfig() {
+  const res = await api('/config');
+  return await res.json();
+}
+async function saveConfigObj(cfg) {
+  const res = await api('/config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(cfg) });
+  if (res.status !== 204) throw new Error(await res.text());
+}
+async function deleteTask(id) {
+  if (!confirm('Delete task ' + id + '?')) return;
+  const cfg = await loadConfig();
+  cfg.tasks = (cfg.tasks || []).filter(t => t.id !== id);
+  await saveConfigObj(cfg);
+  location.reload();
+}
+async function toggleTask(id, enabled) {
+  const cfg = await loadConfig();
+  for (const t of (cfg.tasks||[])) {
+    if (t.id === id) { t.enabled = !enabled; break; }
+  }
+  await saveConfigObj(cfg);
+  location.reload();
+}
+function parseOptsCSV(s) {
+  var out = {};
+  if (!s) return out;
+  var arr = s.split(',');
+  for (var i = 0; i < arr.length; i++) {
+    var part = arr[i];
+    if (!part) continue;
+    var kv = part.split('=');
+    var k = (kv[0] || '').trim();
+    var v = (kv[1] || '').trim();
+    if (k) out[k] = v;
+  }
+  return out;
+}
+function pickDirectoryTo(targetInputId, fileInputEl) {
+  var files = fileInputEl.files;
+  if (files && files.length > 0) {
+    var f = files[0];
+    var dir = '';
+    if (f.webkitRelativePath) {
+      var rel = f.webkitRelativePath;
+      var parts = rel.split('/');
+      parts.pop();
+      dir = '/' + parts.join('/');
+    }
+    var inp = document.getElementById(targetInputId);
+    if (dir) {
+      inp.value = dir;
+    } else {
+      alert('Browser did not expose the absolute directory path. Please paste the path manually.');
+    }
+  }
+}
+function pickFileTo(targetInputId, fileInputEl) {
+  var files = fileInputEl.files;
+  if (files && files.length > 0) {
+    var name = files[0].name || '';
+    var inp = document.getElementById(targetInputId);
+    if (name) {
+      inp.value = '/' + name;
+    }
+  }
+}
 </script>
 </body>
 </html>
@@ -92,7 +185,7 @@ var dashboardTpl = template.Must(template.Must(baseTpl.Clone()).New("content").P
 <div class="card">
   <h2>Tasks (snapshot)</h2>
   <table>
-    <thead><tr><th>ID</th><th>Enabled</th><th>Directory</th><th>Glob</th><th>Workers</th></tr></thead>
+    <thead><tr><th>ID</th><th>Enabled</th><th>Directory</th><th>Glob</th><th>Workers</th><th>Status</th></tr></thead>
     <tbody>
       {{range .Tasks}}
       <tr>
@@ -101,9 +194,17 @@ var dashboardTpl = template.Must(template.Must(baseTpl.Clone()).New("content").P
         <td><code>{{.Watch.Directory}}</code></td>
         <td><code>{{.Watch.Glob}}</code></td>
         <td>{{.Workers}}</td>
+        <td>
+          {{if .NotStarted}}
+            <span class="badge no" title="{{.NotStarted}}">not started</span>
+            <div style="color:#fca5a5; font-size:12px; margin-top:4px; white-space:pre-wrap">{{.NotStarted}}</div>
+          {{else}}
+            <span class="badge yes">running</span>
+          {{end}}
+        </td>
       </tr>
       {{else}}
-      <tr><td colspan="5">No tasks</td></tr>
+      <tr><td colspan="6">No tasks</td></tr>
       {{end}}
     </tbody>
   </table>
@@ -150,7 +251,7 @@ var tasksTpl = template.Must(template.Must(baseTpl.Clone()).New("content").Parse
     <a class="btn" href="/ui" style="margin-left:8px">Back</a>
   </div>
   <table>
-    <thead><tr><th>ID</th><th>Enabled</th><th>Directory</th><th>Glob</th><th>Actions</th></tr></thead>
+    <thead><tr><th>ID</th><th>Enabled</th><th>Directory</th><th>Glob</th><th>Status</th><th>Actions</th></tr></thead>
     <tbody>
       {{range .Tasks}}
       <tr>
@@ -159,42 +260,29 @@ var tasksTpl = template.Must(template.Must(baseTpl.Clone()).New("content").Parse
         <td><code>{{.Watch.Directory}}</code></td>
         <td><code>{{.Watch.Glob}}</code></td>
         <td>
+          {{if .NotStarted}}
+            <span class="badge no" title="{{.NotStarted}}">not started</span>
+            <div style="color:#fca5a5; font-size:12px; margin-top:4px; white-space:pre-wrap">{{.NotStarted}}</div>
+          {{else}}
+            <span class="badge yes">running</span>
+          {{end}}
+        </td>
+        <td>
           <a class="btn" href="/ui/task/edit?id={{.ID}}">Edit</a>
           <button class="secondary" onclick="deleteTask('{{.ID}}')">Delete</button>
-          <button onclick="toggleTask('{{.ID}}', {{.Enabled}})">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
+          {{- if .Enabled -}}
+          <button onclick="toggleTask('{{.ID}}', true)">Disable</button>
+          {{- else -}}
+          <button onclick="toggleTask('{{.ID}}', false)">Enable</button>
+          {{- end -}}
         </td>
       </tr>
       {{else}}
-      <tr><td colspan="5">No tasks</td></tr>
+      <tr><td colspan="6">No tasks</td></tr>
       {{end}}
     </tbody>
   </table>
 </div>
-<script>
-async function loadConfig() {
-  const res = await api('/config');
-  return await res.json();
-}
-async function saveConfigObj(cfg) {
-  const res = await api('/config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(cfg) });
-  if (res.status !== 204) throw new Error(await res.text());
-}
-async function deleteTask(id) {
-  if (!confirm('Delete task ' + id + '?')) return;
-  const cfg = await loadConfig();
-  cfg.tasks = (cfg.tasks || []).filter(t => t.id !== id);
-  await saveConfigObj(cfg);
-  location.reload();
-}
-async function toggleTask(id, enabled) {
-  const cfg = await loadConfig();
-  for (const t of (cfg.tasks||[])) {
-    if (t.id === id) { t.enabled = !enabled; break; }
-  }
-  await saveConfigObj(cfg);
-  location.reload();
-}
-</script>
 `))
 
 var taskFormTpl = template.Must(template.Must(baseTpl.Clone()).New("content").Parse(`
@@ -209,7 +297,15 @@ var taskFormTpl = template.Must(template.Must(baseTpl.Clone()).New("content").Pa
       </div>
       <div class="card">
         <h3>Watch</h3>
-        <label>Directory<br><input type="text" id="watch_directory" value="{{.Task.Watch.Directory}}"></label><br><br>
+        <label>Directory<br>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="text" id="watch_directory" value="{{.Task.Watch.Directory}}" placeholder="/absolute/path">
+            <span class="pathpicker">
+              <label class="btn" for="watch_directory_picker">Browse…</label>
+              <input type="file" id="watch_directory_picker" webkitdirectory directory onchange="pickDirectoryTo('watch_directory', this)">
+            </span>
+          </div>
+        </label><br><br>
         <label>Glob<br><input type="text" id="watch_glob" value="{{.Task.Watch.Glob}}"></label><br><br>
         <label>Debounce (ms)<br><input type="number" id="watch_debounce" value="{{.Task.Watch.DebounceMs}}"></label><br><br>
         <label>Stabilization (ms)<br><input type="number" id="watch_stabilization" value="{{.Task.Watch.StabilizationMs}}"></label>
@@ -249,34 +345,6 @@ try {
 } catch (e) {
   pipeline = [];
 }
-
-// Simple element builder without template literals or spread syntax
-function el(tag, attrs) {
-  var e = document.createElement(tag);
-  if (attrs) {
-    for (var k in attrs) {
-      if (!Object.prototype.hasOwnProperty.call(attrs, k)) continue;
-      var v = attrs[k];
-      if (k === 'class') e.className = v;
-      else if (k === 'for') e.htmlFor = v;
-      else e.setAttribute(k, v);
-    }
-  }
-  for (var i = 2; i < arguments.length; i++) {
-    var c = arguments[i];
-    if (c == null) continue;
-    if (typeof c === 'string') e.appendChild(document.createTextNode(c));
-    else e.appendChild(c);
-  }
-  return e;
-}
-
-function checkbox(id, checked) {
-  var input = el('input', { type: 'checkbox', id: id });
-  if (checked) input.setAttribute('checked', 'checked');
-  return input;
-}
-
 function render() {
   var container = document.getElementById('steps');
   container.innerHTML = '';
@@ -291,7 +359,20 @@ function render() {
 
     if (s.type === 'copy') {
       var c = s.copy || {};
-      box.appendChild(el('label', null, 'Destination', el('br'), el('input', { type: 'text', value: c.destination || '', id: 'copy_dest_' + idx })));
+      var row = el('div', null,
+        el('label', null, 'Destination', el('br'),
+          el('input', { type: 'text', value: c.destination || '', id: 'copy_dest_' + idx, placeholder:'/absolute/path' })
+        )
+      );
+      var picker = el('span', { class:'pathpicker' },
+        el('label', { class:'btn', for:'copy_dest_picker_' + idx }, 'Browse…'),
+        el('input', { type:'file', id:'copy_dest_picker_' + idx })
+      );
+      picker.lastChild.addEventListener('change', (function(i){
+        return function(ev){ pickFileTo('copy_dest_' + i, ev.target); };
+      })(idx));
+      row.appendChild(picker);
+      box.appendChild(row);
       box.appendChild(el('br'));
       box.appendChild(el('label', null, checkbox('copy_atomic_' + idx, !!c.atomic), ' Atomic'));
       box.appendChild(el('br'));
@@ -341,12 +422,10 @@ function render() {
     container.appendChild(box);
   });
 }
-
 function removeStep(idx) {
   pipeline.splice(idx, 1);
   render();
 }
-
 function addStep() {
   var t = document.getElementById('newStepType').value;
   var base = { type: t };
@@ -357,23 +436,7 @@ function addStep() {
   pipeline.push(base);
   render();
 }
-
-function parseOptsCSV(s) {
-  var out = {};
-  if (!s) return out;
-  var arr = s.split(',');
-  for (var i = 0; i < arr.length; i++) {
-    var part = arr[i];
-    if (!part) continue;
-    var kv = part.split('=');
-    var k = (kv[0] || '').trim();
-    var v = (kv[1] || '').trim();
-    if (k) out[k] = v;
-  }
-  return out;
-}
-
-async function submitTask(ev) {
+function submitTask(ev) {
   ev.preventDefault();
   var id = document.getElementById('id').value.trim();
   var enabled = document.getElementById('enabled').checked;
@@ -427,42 +490,41 @@ async function submitTask(ev) {
     }
   });
 
-  var cfgRes = await api('/config');
-  var cfg = await cfgRes.json();
-  if (!Array.isArray(cfg.tasks)) cfg.tasks = [];
-
-  var mode = '{{.Mode}}';
-  if (mode === 'New') {
-    for (var i = 0; i < cfg.tasks.length; i++) {
-      if (cfg.tasks[i].id === id) { alert('Task id already exists'); return; }
-    }
-    cfg.tasks.push({
-      id: id, enabled: enabled,
-      watch: { directory: dir, glob: glob, debounceMs: debounce, stabilizationMs: stab },
-      pipeline: steps
-    });
-  } else {
-    for (var j = 0; j < cfg.tasks.length; j++) {
-      if (cfg.tasks[j].id === id) {
-        cfg.tasks[j] = {
-          id: id, enabled: enabled,
-          watch: { directory: dir, glob: glob, debounceMs: debounce, stabilizationMs: stab },
-          pipeline: steps
-        };
-        break;
+  fetch('/config').then(function(r){ return r.json(); }).then(function(cfg){
+    if (!Array.isArray(cfg.tasks)) cfg.tasks = [];
+    var mode = '{{.Mode}}';
+    if (mode === 'New') {
+      for (var i = 0; i < cfg.tasks.length; i++) {
+        if (cfg.tasks[i].id === id) { alert('Task id already exists'); return; }
+      }
+      cfg.tasks.push({
+        id: id, enabled: enabled,
+        watch: { directory: dir, glob: glob, debounceMs: debounce, stabilizationMs: stab },
+        pipeline: steps
+      });
+    } else {
+      for (var j = 0; j < cfg.tasks.length; j++) {
+        if (cfg.tasks[j].id === id) {
+          cfg.tasks[j] = {
+            id: id, enabled: enabled,
+            watch: { directory: dir, glob: glob, debounceMs: debounce, stabilizationMs: stab },
+            pipeline: steps
+          };
+          break;
+        }
       }
     }
-  }
-
-  await api('/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) });
-  alert('Task saved');
-  location.href = '/ui/tasks';
+    return fetch('/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(cfg) });
+  }).then(function(){ alert('Task saved'); location.href='/ui/tasks'; }).catch(function(e){ alert('Save failed: ' + e.message); });
 }
-
 render();
 </script>
 `))
 
+/*
+Legacy mountUI kept below for reference during refactor.
+The real mountUI implementation lives further down in this file.
+*/
 // mountUI registers server-rendered HTML routes under /ui.
 func (s *Server) mountUI() {
 	// Dashboard
@@ -629,8 +691,6 @@ func (s *Server) mountUI() {
 		// Ensure valid JSON array or object is embedded and not empty
 		js := "[]"
 		if len(pj) > 0 && string(pj) != "null" {
-			// Ensure we always embed a JSON array for the client script
-			// If the stored value is not an array, wrap it.
 			if len(pj) > 0 && pj[0] == '[' {
 				js = string(pj)
 			} else {
@@ -665,14 +725,11 @@ func (rr *responseRecorder) Write(b []byte) (int, error) {
 
 // versionFromBuild returns backend version injected by linker or "dev".
 func versionFromBuild() string {
-	// Backend version is provided via template data from handlers (see mountUI).
-	// We keep this function for template compatibility.
 	return ""
 }
 
 // frontendVersion reads persisted version/version.frontend file.
 func frontendVersion() string {
-	// Prefer file under version/frontend.version
 	b, err := os.ReadFile("version/frontend.version")
 	if err == nil {
 		s := strings.TrimSpace(string(b))

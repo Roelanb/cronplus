@@ -45,11 +45,17 @@ func New(log Logger, ctrl Control, addr string) *Server {
 		mux:  mux,
 		addr: addr,
 	}
+	// API endpoints
 	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/tasks", s.handleTasks)
 	mux.HandleFunc("/reload", s.handleReload)
 	// Config management endpoints
 	mux.HandleFunc("/config", s.handleConfig)
+
+	// No external static assets anymore; UI is inline in templates.
+	// If a static handler was previously set, it's removed now.
+	// (leaving this comment intentionally for future reference)
+
 	// Mount server-rendered UI
 	s.mountUI()
 	// Prometheus /metrics will be mounted later via promhttp if enabled

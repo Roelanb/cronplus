@@ -22,6 +22,9 @@ type Manager struct {
 	tasks  map[string]*supervisor
 	concur int
 	cfg    *config.Config
+
+	// reason per task if it couldn't be started
+	notStartedReasons map[string]string
 }
 
 // observabilityLogger is minimal interface from zap.SugaredLogger we use.
@@ -29,15 +32,17 @@ type observabilityLogger interface {
 	Infow(msg string, keysAndValues ...any)
 	Errorw(msg string, keysAndValues ...any)
 	Debugw(msg string, keysAndValues ...any)
+	Warnw(msg string, keysAndValues ...any)
 }
 
 // NewManager creates a manager with provided logger and state store.
 func NewManager(logger observabilityLogger, state StateStore, defaultConcurrency int) *Manager {
 	return &Manager{
-		log:    logger,
-		state:  state,
-		tasks:  map[string]*supervisor{},
-		concur: defaultConcurrency,
+		log:               logger,
+		state:             state,
+		tasks:             map[string]*supervisor{},
+		concur:            defaultConcurrency,
+		notStartedReasons: map[string]string{},
 	}
 }
 
@@ -59,10 +64,19 @@ func (m *Manager) ApplyConfig(ctx context.Context, cfg *config.Config) error {
 			delete(m.tasks, id)
 		}
 	}
+	// reset reasons for tasks not present anymore
+	for id := range m.notStartedReasons {
+		if _, ok := existing[id]; !ok {
+			delete(m.notStartedReasons, id)
+		}
+	}
 
 	// start/update tasks
-	for _, t := range cfg.Tasks {
+	for ti := range cfg.Tasks {
+		t := &cfg.Tasks[ti]
 		if !t.Enabled {
+			// If disabled explicitly, clear any previous not-started reason
+			delete(m.notStartedReasons, t.ID)
 			if sup, ok := m.tasks[t.ID]; ok {
 				sup.stop()
 				delete(m.tasks, t.ID)
@@ -70,6 +84,8 @@ func (m *Manager) ApplyConfig(ctx context.Context, cfg *config.Config) error {
 			continue
 		}
 		if sup, ok := m.tasks[t.ID]; ok {
+			// existing running supervisor; clear any previous reason since it's running
+			delete(m.notStartedReasons, t.ID)
 			// TODO: for future: compare settings and restart if needed
 			_ = sup // unchanged for minimal iteration
 			continue
@@ -78,10 +94,23 @@ func (m *Manager) ApplyConfig(ctx context.Context, cfg *config.Config) error {
 		if conc <= 0 {
 			conc = m.concur
 		}
-		sup, err := newSupervisor(ctx, m.log, m.state, t, conc)
+		sup, err := newSupervisor(ctx, m.log, m.state, *t, conc)
 		if err != nil {
-			return fmt.Errorf("start task %s: %w", t.ID, err)
+			// If a task cannot be started (e.g., watch directory missing), disable it in cfg,
+			// remember the reason, and log a warning.
+			t.Enabled = false
+			reason := err.Error()
+			m.notStartedReasons[t.ID] = reason
+			m.log.Warnw("disabling task due to start failure", "task", t.ID, "error", reason)
+			// If there was a previously running supervisor, stop it.
+			if supOld, ok := m.tasks[t.ID]; ok {
+				supOld.stop()
+				delete(m.tasks, t.ID)
+			}
+			continue
 		}
+		// Successfully started; clear any previous reason
+		delete(m.notStartedReasons, t.ID)
 		m.tasks[t.ID] = sup
 	}
 	return nil
@@ -98,7 +127,8 @@ func (m *Manager) TasksSnapshot() any {
 			Directory string `json:"directory"`
 			Glob      string `json:"glob"`
 		} `json:"watch"`
-		Workers int `json:"workers"`
+		Workers    int    `json:"workers"`
+		NotStarted string `json:"notStartedReason,omitempty"`
 	}
 	var out []taskView
 	if m.cfg != nil {
@@ -110,6 +140,11 @@ func (m *Manager) TasksSnapshot() any {
 			}
 			tv.Watch.Directory = t.Watch.Directory
 			tv.Watch.Glob = t.Watch.Glob
+			if !t.Enabled {
+				if rsn, ok := m.notStartedReasons[t.ID]; ok {
+					tv.NotStarted = rsn
+				}
+			}
 			out = append(out, tv)
 		}
 	}

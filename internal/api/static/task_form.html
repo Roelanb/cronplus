@@ -1,0 +1,339 @@
+{{ define "content" }}
+<div class="card">
+  <h2>{{.Mode}} Task</h2>
+  <form id="taskForm" onsubmit="return submitTask(event)">
+    <div class="grid two">
+      <div class="card">
+        <h3>General</h3>
+        <label>ID<br><input type="text" id="id" value="{{.Task.ID}}" {{if eq .Mode "Edit"}}readonly{{end}}></label><br><br>
+        <label><input type="checkbox" id="enabled" {{if .Task.Enabled}}checked{{end}}> Enabled</label>
+      </div>
+      <div class="card">
+        <h3>Watch</h3>
+        <label>Directory<br>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="text" id="watch_directory" value="{{.Task.Watch.Directory}}" placeholder="/absolute/path">
+            <span class="pathpicker">
+              <label class="btn" for="watch_directory_picker">Browse…</label>
+              <input type="file" id="watch_directory_picker" webkitdirectory directory onchange="pickDirectoryTo('watch_directory', this)">
+            </span>
+          </div>
+        </label><br><br>
+        <label>Glob<br><input type="text" id="watch_glob" value="{{.Task.Watch.Glob}}"></label><br><br>
+        <label>Debounce (ms)<br><input type="number" id="watch_debounce" value="{{.Task.Watch.DebounceMs}}"></label><br><br>
+        <label>Stabilization (ms)<br><input type="number" id="watch_stabilization" value="{{.Task.Watch.StabilizationMs}}"></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Pipeline</h3>
+      <div id="steps"></div>
+      <div style="margin-top:8px">
+        <select id="newStepType">
+          <option value="copy">copy</option>
+          <option value="delete">delete</option>
+          <option value="archive">archive</option>
+          <option value="print">print</option>
+        </select>
+        <button type="button" onclick="addStep()">Add Step</button>
+      </div>
+    </div>
+
+    <div style="margin-top:8px">
+      <button type="submit">Save</button>
+      <a href="/ui/tasks" class="btn" style="margin-left:8px">Back</a>
+    </div>
+  </form>
+</div>
+
+<script>
+// Initialize pipeline from server-provided JSON
+(function(){
+  var pipeline = "{{.PipelineJSON}}";
+  try { pipeline = JSON.parse(pipeline); } catch(e){ pipeline = []; }
+  if (!Array.isArray(pipeline)) { pipeline = []; }
+
+  function render() {
+    var container = document.getElementById('steps');
+    container.innerHTML = '';
+    (pipeline || []).forEach(function (s, idx) {
+      // Normalize step object to avoid undefined property access errors
+      s = s || {};
+      s.type = s.type || (s.copy ? 'copy' : s.delete ? 'delete' : s.archive ? 'archive' : s.print ? 'print' : '');
+      var box = el('div', { "class": "card" });
+      box.appendChild(el('div', null, el('strong', null, 'Step ' + (idx + 1).toString() + ' — ' + s.type)));
+      var retry = {};
+      if (s.type === 'copy' && s.copy && s.copy.retry) retry = s.copy.retry;
+      else if (s.type === 'delete' && s.delete && s.delete.retry) retry = s.delete.retry;
+      else if (s.type === 'archive' && s.archive && s.archive.retry) retry = s.archive.retry;
+      else if (s.type === 'print' && s.print && s.print.retry) retry = s.print.retry;
+
+      if (s.type === 'copy') {
+        var c = s.copy || {};
+        var row = document.createElement('div');
+        var lab = document.createElement('label');
+        lab.appendChild(document.createTextNode('Destination'));
+        lab.appendChild(document.createElement('br'));
+        var inpCopy = document.createElement('input');
+        inpCopy.setAttribute('type', 'text');
+        inpCopy.setAttribute('id', 'copy_dest_' + idx);
+        inpCopy.setAttribute('placeholder', '/absolute/path');
+        inpCopy.value = c.destination || '';
+        lab.appendChild(inpCopy);
+        row.appendChild(lab);
+        var picker = document.createElement('span');
+        picker.className = 'pathpicker';
+        var lbl = document.createElement('label');
+        lbl.className = 'btn';
+        lbl.htmlFor = 'copy_dest_picker_' + idx;
+        lbl.appendChild(document.createTextNode('Browse…'));
+        var fileInp = document.createElement('input');
+        fileInp.setAttribute('type', 'file');
+        fileInp.setAttribute('id', 'copy_dest_picker_' + idx);
+        picker.appendChild(lbl);
+        picker.appendChild(fileInp);
+        (function(i){
+          fileInp.addEventListener('change', function(ev){
+            pickFileTo('copy_dest_' + i, ev.target);
+          });
+        })(idx);
+        row.appendChild(picker);
+        box.appendChild(row);
+        box.appendChild(el('br'));
+        box.appendChild(el('label', null, checkbox('copy_atomic_' + idx, !!c.atomic), ' Atomic'));
+        box.appendChild(el('br'));
+        box.appendChild(el('label', null, checkbox('copy_verify_' + idx, !!c.verifyChecksum), ' Verify checksum'));
+      } else if (s.type === 'delete') {
+        var d = s.delete || {};
+        box.appendChild(el('label', null, checkbox('delete_secure_' + idx, !!d.secure), ' Secure delete (placeholder)'));
+      } else if (s.type === 'archive') {
+        var a = s.archive || {};
+        (function(){
+          var l = document.createElement('label');
+          l.appendChild(document.createTextNode('Destination'));
+          l.appendChild(document.createElement('br'));
+          var inp = document.createElement('input');
+          inp.setAttribute('type', 'text');
+          inp.setAttribute('id', 'archive_dest_' + idx);
+          inp.value = a.destination || '';
+          l.appendChild(inp);
+          box.appendChild(l);
+        })();
+        box.appendChild(el('br'));
+        var sel = document.createElement('select');
+        sel.id = 'archive_conflict_' + idx;
+        ['rename', 'overwrite', 'skip'].forEach(function (v) {
+          var opt = document.createElement('option');
+          opt.value = v;
+          opt.textContent = v;
+          if ((a.conflictStrategy || 'rename') === v) opt.selected = true;
+          sel.appendChild(opt);
+        });
+        box.appendChild(el('label', null, 'Conflict Strategy', el('br'), sel));
+      } else if (s.type === 'print') {
+        var p = s.print || {};
+        (function(){
+          var l = document.createElement('label');
+          l.appendChild(document.createTextNode('Printer Name'));
+          l.appendChild(document.createElement('br'));
+          var inp = document.createElement('input');
+          inp.setAttribute('type', 'text');
+          inp.setAttribute('id', 'print_printer_' + idx);
+          inp.value = p.printerName || '';
+          l.appendChild(inp);
+          box.appendChild(l);
+        })();
+        var optStr = '';
+        if (p.options) {
+          var parts = [];
+          for (var k in p.options) {
+            if (!Object.prototype.hasOwnProperty.call(p.options, k)) continue;
+            parts.push(k + '=' + p.options[k]);
+          }
+          optStr = parts.join(',');
+        }
+        box.appendChild(el('br'));
+        (function(){
+          var l = document.createElement('label');
+          l.appendChild(document.createTextNode('Options (key=value,key2=value2)'));
+          l.appendChild(document.createElement('br'));
+          var inp = document.createElement('input');
+          inp.setAttribute('type', 'text');
+          inp.setAttribute('id', 'print_opts_' + idx);
+          inp.value = optStr;
+          l.appendChild(inp);
+          box.appendChild(l);
+        })();
+        box.appendChild(el('br'));
+        (function(){
+          var l = document.createElement('label');
+          l.appendChild(document.createTextNode('Timeout (sec)'));
+          l.appendChild(document.createElement('br'));
+          var inp = document.createElement('input');
+          inp.setAttribute('type', 'number');
+          inp.setAttribute('id', 'print_timeout_' + idx);
+          inp.value = (p.timeoutSec || 60);
+          l.appendChild(inp);
+          box.appendChild(l);
+        })();
+        box.appendChild(el('br'));
+        (function(){
+          var l = document.createElement('label');
+          l.appendChild(document.createTextNode('Copies'));
+          l.appendChild(document.createElement('br'));
+          var inp = document.createElement('input');
+          inp.setAttribute('type', 'number');
+          inp.setAttribute('id', 'print_copies_' + idx);
+          inp.value = (p.copies || 1);
+          l.appendChild(inp);
+          box.appendChild(l);
+        })();
+      }
+
+      box.appendChild(el('br'));
+      (function(){
+        var l = document.createElement('label');
+        l.appendChild(document.createTextNode('Retry Max'));
+        l.appendChild(document.createElement('br'));
+        var inp = document.createElement('input');
+        inp.setAttribute('type', 'number');
+        inp.setAttribute('id', 'retry_max_' + idx);
+        inp.value = (retry.max || 0);
+        l.appendChild(inp);
+        box.appendChild(l);
+      })();
+      box.appendChild(el('br'));
+      (function(){
+        var l = document.createElement('label');
+        l.appendChild(document.createTextNode('Retry Backoff (ms)'));
+        l.appendChild(document.createElement('br'));
+        var inp = document.createElement('input');
+        inp.setAttribute('type', 'number');
+        inp.setAttribute('id', 'retry_backoff_' + idx);
+        inp.value = (retry.backoffMs || 1000);
+        l.appendChild(inp);
+        box.appendChild(l);
+      })();
+
+      var btnWrap = document.createElement('div');
+      btnWrap.setAttribute('style', 'margin-top:8px');
+      var rmBtn = document.createElement('button');
+      rmBtn.setAttribute('type', 'button');
+      rmBtn.textContent = 'Remove';
+      (function(i){
+        rmBtn.addEventListener('click', function(){ removeStep(i); });
+      })(idx);
+      btnWrap.appendChild(rmBtn);
+      box.appendChild(btnWrap);
+
+      container.appendChild(box);
+    });
+  }
+
+  window.removeStep = function(idx) {
+    pipeline.splice(idx, 1);
+    render();
+  };
+
+  window.addStep = function() {
+    var t = document.getElementById('newStepType').value;
+    var base = { type: t };
+    if (t === 'copy') base.copy = { destination: '', atomic: true, verifyChecksum: false, retry: { max: 0, backoffMs: 1000 } };
+    if (t === 'delete') base.delete = { secure: false, retry: { max: 0, backoffMs: 1000 } };
+    if (t === 'archive') base.archive = { destination: '', conflictStrategy: 'rename', retry: { max: 0, backoffMs: 1000 } };
+    if (t === 'print') base.print = { printerName: '', options: {}, timeoutSec: 60, copies: 1, retry: { max: 0, backoffMs: 1000 } };
+    pipeline.push(base);
+    render();
+  };
+
+  window.submitTask = async function(ev) {
+    ev.preventDefault();
+    var id = document.getElementById('id').value.trim();
+    var enabled = document.getElementById('enabled').checked;
+    var dir = document.getElementById('watch_directory').value.trim();
+    var glob = document.getElementById('watch_glob').value.trim();
+    var debounce = parseInt(document.getElementById('watch_debounce').value || '0', 10);
+    var stab = parseInt(document.getElementById('watch_stabilization').value || '0', 10);
+    if (!id) { alert('ID required'); return; }
+    if (!dir) { alert('Watch directory required'); return; }
+
+    var steps = [];
+    (pipeline || []).forEach(function (s, idx) {
+      if (s.type === 'copy') {
+        steps.push({ type: 'copy', copy: {
+          destination: document.getElementById('copy_dest_' + idx).value.trim(),
+          atomic: document.getElementById('copy_atomic_' + idx).checked,
+          verifyChecksum: document.getElementById('copy_verify_' + idx).checked,
+          retry: {
+            max: parseInt(document.getElementById('retry_max_' + idx).value || '0', 10),
+            backoffMs: parseInt(document.getElementById('retry_backoff_' + idx).value || '1000', 10)
+          }
+        }});
+      } else if (s.type === 'delete') {
+        steps.push({ type: 'delete', delete: {
+          secure: document.getElementById('delete_secure_' + idx).checked,
+          retry: {
+            max: parseInt(document.getElementById('retry_max_' + idx).value || '0', 10),
+            backoffMs: parseInt(document.getElementById('retry_backoff_' + idx).value || '1000', 10)
+          }
+        }});
+      } else if (s.type === 'archive') {
+        steps.push({ type: 'archive', archive: {
+          destination: document.getElementById('archive_dest_' + idx).value.trim(),
+          conflictStrategy: document.getElementById('archive_conflict_' + idx).value,
+          retry: {
+            max: parseInt(document.getElementById('retry_max_' + idx).value || '0', 10),
+            backoffMs: parseInt(document.getElementById('retry_backoff_' + idx).value || '1000', 10)
+          }
+        }});
+      } else if (s.type === 'print') {
+        steps.push({ type: 'print', print: {
+          printerName: document.getElementById('print_printer_' + idx).value.trim(),
+          options: parseOptsCSV(document.getElementById('print_opts_' + idx).value),
+          timeoutSec: parseInt(document.getElementById('print_timeout_' + idx).value || '60', 10),
+          copies: parseInt(document.getElementById('print_copies_' + idx).value || '1', 10),
+          retry: {
+            max: parseInt(document.getElementById('retry_max_' + idx).value || '0', 10),
+            backoffMs: parseInt(document.getElementById('retry_backoff_' + idx).value || '1000', 10)
+          }
+        }});
+      }
+    });
+
+    var cfgRes = await api('/config');
+    var cfg = await cfgRes.json();
+    if (!Array.isArray(cfg.tasks)) cfg.tasks = [];
+
+    var mode = '{{.Mode}}';
+    if (mode === 'New') {
+      for (var i = 0; i < cfg.tasks.length; i++) {
+        if (cfg.tasks[i].id === id) { alert('Task id already exists'); return; }
+      }
+      cfg.tasks.push({
+        id: id, enabled: enabled,
+        watch: { directory: dir, glob: glob, debounceMs: debounce, stabilizationMs: stab },
+        pipeline: steps
+      });
+    } else {
+      for (var j = 0; j < cfg.tasks.length; j++) {
+        if (cfg.tasks[j].id === id) {
+          cfg.tasks[j] = {
+            id: id, enabled: enabled,
+            watch: { directory: dir, glob: glob, debounceMs: debounce, stabilizationMs: stab },
+            pipeline: steps
+          };
+          break;
+        }
+      }
+    }
+
+    await api('/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) });
+    alert('Task saved');
+    location.href = '/ui/tasks';
+  };
+
+  // First render
+  render();
+})();
+</script>
+{{ end }}
