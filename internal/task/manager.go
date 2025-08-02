@@ -263,6 +263,13 @@ func handleFilePipeline(ctx context.Context, log observabilityLogger, state Stat
 }
 
 func runPipeline(ctx context.Context, log observabilityLogger, t config.Task, srcPath string) error {
+	// Build variable map for interpolation from task.Variables
+	vars := map[string]string{}
+	for _, v := range t.Variables {
+		// values are already validated/normalized by loader; keep as provided
+		vars[v.Name] = v.Value
+	}
+
 	// Extended to support copy, delete, and archive with retry/backoff per-step.
 	for i, step := range t.Pipeline {
 		switch step.Type {
@@ -270,8 +277,13 @@ func runPipeline(ctx context.Context, log observabilityLogger, t config.Task, sr
 			if step.Copy == nil {
 				return fmt.Errorf("pipeline[%d] copy: missing options", i)
 			}
+			// Interpolate destination
+			local := step
+			if local.Copy != nil {
+				local.Copy.Destination = actions.ResolveVariables(local.Copy.Destination, vars)
+			}
 			fn := func() error {
-				_, err := doCopy(srcPath, step)
+				_, err := doCopy(srcPath, local)
 				return err
 			}
 			if err := withRetry(ctx, log, "copy", t.ID, i, step.Copy.Retry, fn); err != nil {
@@ -281,7 +293,7 @@ func runPipeline(ctx context.Context, log observabilityLogger, t config.Task, sr
 			if step.Delete == nil {
 				return fmt.Errorf("pipeline[%d] delete: missing options", i)
 			}
-			// Delete the original source only after successful copy (if any prior step was copy).
+			// Nothing to interpolate for delete currently
 			fn := func() error {
 				return doDelete(srcPath, step)
 			}
@@ -292,15 +304,21 @@ func runPipeline(ctx context.Context, log observabilityLogger, t config.Task, sr
 			if step.Archive == nil {
 				return fmt.Errorf("pipeline[%d] archive: missing options", i)
 			}
+			// Interpolate destination
+			local := step
+			if local.Archive != nil {
+				local.Archive.Destination = actions.ResolveVariables(local.Archive.Destination, vars)
+			}
 			fn := func() error {
-				return doArchive(srcPath, step)
+				return doArchive(srcPath, local)
 			}
 			// No retry field on archive step in model; treat as no-retry unless added
 			if err := withRetry(ctx, log, "archive", t.ID, i, nil, fn); err != nil {
 				return fmt.Errorf("pipeline[%d] archive: %w", i, err)
 			}
 		case "print":
-			// Not implemented in this iteration
+			// Not implemented in this iteration; placeholder for future interpolation:
+			// printerName, options values could be interpolated similarly.
 		default:
 			// Unknown type; ignore
 		}

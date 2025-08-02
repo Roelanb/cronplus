@@ -16,4 +16,24 @@ Improvement 3:
 
 Add a file or folder dialog picker for fields that require a path.
 
+[x] Implemented
+
+
+Improvement 4:
+
+Add the possibility to add variables (multiple) to tasks.
+These variables have a name and a value and a datatype (string, int, bool, date, datetime).
+These variables can be used in the pipeline steps as ${variableName}.
+
+[ ] Implemented
+
+
+Improvement 5:
+
+redesign th edit task page, make it more user friendly.
+It should show a header section with the ID, enabled checkbox, and the watch section.
+Under that, it should show the variables section.
+Under that, it should show the pipeline section.
+Put the save, cancel and delete buttons at the top.
+
 [ ] Implemented

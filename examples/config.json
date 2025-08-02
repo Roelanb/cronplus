@@ -12,19 +12,6 @@
       },
       "pipeline": [
         {
-          "type": "print",
-          "print": {
-            "printerName": "fgggf",
-            "copies": 1,
-            "duplex": false,
-            "timeoutSec": 60,
-            "retry": {
-              "max": 0,
-              "backoffMs": 1000
-            }
-          }
-        },
-        {
           "type": "archive",
           "archive": {
             "destination": "/tmp/cronplus/archive",

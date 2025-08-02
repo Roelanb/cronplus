@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 
 	"go.uber.org/zap"
 )
@@ -95,6 +98,14 @@ func applyDefaults(cfg *Config) {
 		if t.Watch.StabilizationMs < 0 {
 			t.Watch.StabilizationMs = 0
 		}
+		// Variables: no defaults besides trimming spaces
+		if len(t.Variables) > 0 {
+			for vi := range t.Variables {
+				t.Variables[vi].Name = strings.TrimSpace(t.Variables[vi].Name)
+				t.Variables[vi].Type = strings.TrimSpace(t.Variables[vi].Type)
+			}
+		}
+
 		// Pipeline step defaults
 		for pi := range t.Pipeline {
 			step := &t.Pipeline[pi]
@@ -313,6 +324,81 @@ func validateLenient(cfg *Config, logger *zap.SugaredLogger) error {
 			} else if t.Watch.StabilizationMs < 0 {
 				taskErr = fmt.Errorf("tasks[%s]: watch.stabilizationMs must be >= 0", t.ID)
 			}
+		}
+
+		// Variables validation (lenient): drop invalid variables, keep task running
+		if taskErr == nil && len(t.Variables) > 0 {
+			seen := map[string]struct{}{}
+			valid := make([]Variable, 0, len(t.Variables))
+			for _, v := range t.Variables {
+				name := strings.TrimSpace(v.Name)
+				typ := strings.TrimSpace(strings.ToLower(v.Type))
+				val := strings.TrimSpace(v.Value)
+				if name == "" {
+					if logger != nil {
+						logger.Warnw("Dropping invalid variable (empty name)", "taskID", t.ID)
+					}
+					continue
+				}
+				if _, dup := seen[name]; dup {
+					if logger != nil {
+						logger.Warnw("Dropping duplicate variable", "taskID", t.ID, "name", name)
+					}
+					continue
+				}
+				switch typ {
+				case "string", "":
+					// always ok
+				case "int":
+					if _, err := strconv.Atoi(val); err != nil {
+						if logger != nil {
+							logger.Warnw("Dropping invalid int variable", "taskID", t.ID, "name", name, "value", val, "error", err.Error())
+						}
+						continue
+					}
+				case "bool":
+					if _, err := strconv.ParseBool(strings.ToLower(val)); err != nil {
+						if logger != nil {
+							logger.Warnw("Dropping invalid bool variable", "taskID", t.ID, "name", name, "value", val, "error", err.Error())
+						}
+						continue
+					}
+				case "date":
+					// Accept ISO date
+					if _, err := time.Parse("2006-01-02", val); err != nil {
+						if logger != nil {
+							logger.Warnw("Dropping invalid date variable (expect YYYY-MM-DD)", "taskID", t.ID, "name", name, "value", val, "error", err.Error())
+						}
+						continue
+					}
+				case "datetime":
+					// Accept RFC3339 or common "YYYY-MM-DD HH:MM:SS"
+					if _, err := time.Parse(time.RFC3339, val); err != nil {
+						if _, err2 := time.Parse("2006-01-02 15:04:05", val); err2 != nil {
+							if logger != nil {
+								logger.Warnw("Dropping invalid datetime variable (expect RFC3339 or 'YYYY-MM-DD HH:MM:SS')", "taskID", t.ID, "name", name, "value", val, "error", err.Error())
+							}
+							continue
+						}
+					}
+				default:
+					if logger != nil {
+						logger.Warnw("Dropping variable with unsupported type", "taskID", t.ID, "name", name, "type", typ)
+					}
+					continue
+				}
+				seen[name] = struct{}{}
+				// Normalize accepted type (default to "string" if empty)
+				if typ == "" {
+					typ = "string"
+				}
+				valid = append(valid, Variable{
+					Name:  name,
+					Type:  typ,
+					Value: val,
+				})
+			}
+			t.Variables = valid
 		}
 
 		// Pipeline validations

@@ -95,9 +95,12 @@ function el(tag, attrs) {
   return e;
 }
 function checkbox(id, checked) {
-  var input = el('input', { type: 'checkbox', id: id });
+  // Materialize switch-style checkbox
+  var input = el('input', { type: 'checkbox', id: id, class: 'filled-in' });
   if (checked) input.setAttribute('checked', 'checked');
-  return input;
+  var label = el('label', { for: id });
+  var wrapper = el('p', null, input, label);
+  return wrapper;
 }
 async function loadConfig() {
   const res = await api('/config');
@@ -289,31 +292,73 @@ var taskFormTpl = template.Must(template.Must(baseTpl.Clone()).New("content").Pa
 <div class="card">
   <h2>{{.Mode}} Task</h2>
   <form id="taskForm" onsubmit="return submitTask(event)">
-    <div class="grid two">
-      <div class="card">
-        <h3>General</h3>
-        <label>ID<br><input type="text" id="id" value="{{.Task.ID}}" {{if eq .Mode "Edit"}}readonly{{end}}></label><br><br>
-        <label><input type="checkbox" id="enabled" {{if .Task.Enabled}}checked{{end}}> Enabled</label>
-      </div>
-      <div class="card">
-        <h3>Watch</h3>
-        <label>Directory<br>
-          <div style="display:flex;align-items:center;gap:8px">
-            <input type="text" id="watch_directory" value="{{.Task.Watch.Directory}}" placeholder="/absolute/path">
-            <span class="pathpicker">
-              <label class="btn" for="watch_directory_picker">Browse…</label>
-              <input type="file" id="watch_directory_picker" webkitdirectory directory onchange="pickDirectoryTo('watch_directory', this)">
-            </span>
-          </div>
-        </label><br><br>
-        <label>Glob<br><input type="text" id="watch_glob" value="{{.Task.Watch.Glob}}"></label><br><br>
-        <label>Debounce (ms)<br><input type="number" id="watch_debounce" value="{{.Task.Watch.DebounceMs}}"></label><br><br>
-        <label>Stabilization (ms)<br><input type="number" id="watch_stabilization" value="{{.Task.Watch.StabilizationMs}}"></label>
+    <!-- Action buttons at the top -->
+    <div style="margin-bottom:16px">
+      <button type="submit">Save</button>
+      <a href="/ui/tasks" class="btn secondary" style="margin-left:8px">Cancel</a>
+      {{if eq .Mode "Edit"}}
+      <button type="button" class="btn secondary" style="margin-left:8px" onclick="deleteTask()">Delete</button>
+      {{end}}
+    </div>
+
+    <!-- Header section with ID and Enabled checkbox -->
+    <div class="card">
+      <h3>Task Information</h3>
+      <div class="grid two">
+        <div>
+          <label>ID<br><input type="text" id="id" value="{{.Task.ID}}" {{if eq .Mode "Edit"}}readonly{{end}}></label>
+        </div>
+        <div>
+          <label><input type="checkbox" id="enabled" {{if .Task.Enabled}}checked{{end}}> Enabled</label>
+        </div>
       </div>
     </div>
 
+    <!-- Watch section -->
     <div class="card">
-      <h3>Pipeline</h3>
+      <h3>Watch Settings</h3>
+      <label>Directory<br>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="text" id="watch_directory" value="{{.Task.Watch.Directory}}" placeholder="/absolute/path">
+          <span class="pathpicker">
+            <label class="btn" for="watch_directory_picker">Browse…</label>
+          </span>
+        </div>
+        <input type="file" id="watch_directory_picker" webkitdirectory directory onchange="pickDirectoryTo('watch_directory', this)" style="display:none">
+      </label><br>
+      <div class="grid two">
+        <div>
+          <label>Glob<br><input type="text" id="watch_glob" value="{{.Task.Watch.Glob}}"></label>
+        </div>
+        <div>
+          <label>Debounce (ms)<br><input type="number" id="watch_debounce" value="{{.Task.Watch.DebounceMs}}"></label>
+        </div>
+        <div>
+          <label>Stabilization (ms)<br><input type="number" id="watch_stabilization" value="{{.Task.Watch.StabilizationMs}}"></label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Variables section -->
+    <div class="card">
+      <h3>Variables</h3>
+      <div id="vars"></div>
+      <div style="margin-top:8px">
+        <select id="newVarType">
+          <option value="string">string</option>
+          <option value="int">int</option>
+          <option value="bool">bool</option>
+          <option value="date">date</option>
+          <option value="datetime">datetime</option>
+        </select>
+        <button type="button" onclick="addVar()">Add Variable</button>
+      </div>
+      <p style="color:#9ca3af;margin-top:6px">Use variables in pipeline fields as ${variableName}.</p>
+    </div>
+
+    <!-- Pipeline section -->
+    <div class="card">
+      <h3>Pipeline Steps</h3>
       <div id="steps"></div>
       <div style="margin-top:8px">
         <select id="newStepType">
@@ -325,16 +370,12 @@ var taskFormTpl = template.Must(template.Must(baseTpl.Clone()).New("content").Pa
         <button type="button" onclick="addStep()">Add Step</button>
       </div>
     </div>
-
-    <div style="margin-top:8px">
-      <button type="submit">Save</button>
-      <a href="/ui/tasks" class="btn" style="margin-left:8px">Back</a>
-    </div>
   </form>
 </div>
 
 <script>
 let pipeline = {{.PipelineJSON}};
+let variables = [];
 try {
   if (typeof pipeline === 'string') {
     var parsed = JSON.parse(pipeline);
@@ -345,10 +386,68 @@ try {
 } catch (e) {
   pipeline = [];
 }
+function renderVars() {
+  var vcont = document.getElementById('vars');
+  if (!vcont) return;
+  vcont.innerHTML = '';
+  (variables || []).forEach(function (v, idx) {
+    var row = el('div', { class: 'card' });
+    row.appendChild(el('div', null, el('strong', null, 'Variable ' + (idx + 1))));
+    // name
+    row.appendChild(el('label', null, 'Name', el('br'), el('input', { type: 'text', value: v.name || '', id: 'var_name_' + idx })));
+    row.appendChild(el('br'));
+    // type
+    var sel = el('select', { id: 'var_type_' + idx });
+    ['string', 'int', 'bool', 'date', 'datetime'].forEach(function (t) {
+      var opt = el('option', { value: t });
+      opt.textContent = t;
+      if ((v.type || 'string') === t) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    row.appendChild(el('label', null, 'Type', el('br'), sel));
+    row.appendChild(el('br'));
+    // value
+    row.appendChild(el('label', null, 'Value', el('br'), el('input', { type: 'text', value: v.value || '', id: 'var_value_' + idx })));
+    row.appendChild(el('div', { style: 'margin-top:8px' }, el('button', { type: 'button', onclick: 'removeVar(' + idx + ')' }, 'Remove')));
+    vcont.appendChild(row);
+  });
+}
+
+function removeVar(idx) {
+  variables.splice(idx, 1);
+  renderVars();
+}
+
+function addVar() {
+  var t = document.getElementById('newVarType').value || 'string';
+  variables.push({ name: '', type: t, value: '' });
+  renderVars();
+}
+
 function render() {
   var container = document.getElementById('steps');
+  if (!container) {
+    console.error('Pipeline steps container not found');
+    return;
+  }
+  
   container.innerHTML = '';
+  
+  // Check if helper functions are available
+  if (typeof el !== 'function') {
+    console.error('Helper function el() not available');
+    return;
+  }
+  
+  if (typeof checkbox !== 'function') {
+    console.error('Helper function checkbox() not available');
+    return;
+  }
+  
+  console.log('Rendering pipeline steps:', pipeline);
+  
   (pipeline || []).forEach(function (s, idx) {
+    console.log('Rendering step', idx, s);
     var box = el('div', { class: 'card' });
     box.appendChild(el('div', null, el('strong', null, 'Step ' + (idx + 1).toString() + ' — ' + s.type)));
     var retry = {};
@@ -421,6 +520,8 @@ function render() {
 
     container.appendChild(box);
   });
+  
+  console.log('Finished rendering', pipeline.length, 'pipeline steps');
 }
 function removeStep(idx) {
   pipeline.splice(idx, 1);
@@ -493,6 +594,17 @@ function submitTask(ev) {
   fetch('/config').then(function(r){ return r.json(); }).then(function(cfg){
     if (!Array.isArray(cfg.tasks)) cfg.tasks = [];
     var mode = '{{.Mode}}';
+    // collect variables from UI
+    var varsOut = [];
+    (variables || []).forEach(function (v, idx) {
+      var name = (document.getElementById('var_name_' + idx).value || '').trim();
+      var typ = (document.getElementById('var_type_' + idx).value || 'string').trim();
+      var val = (document.getElementById('var_value_' + idx).value || '').trim();
+      if (name) {
+        varsOut.push({ name: name, type: typ, value: val });
+      }
+    });
+
     if (mode === 'New') {
       for (var i = 0; i < cfg.tasks.length; i++) {
         if (cfg.tasks[i].id === id) { alert('Task id already exists'); return; }
@@ -500,7 +612,8 @@ function submitTask(ev) {
       cfg.tasks.push({
         id: id, enabled: enabled,
         watch: { directory: dir, glob: glob, debounceMs: debounce, stabilizationMs: stab },
-        pipeline: steps
+        pipeline: steps,
+        variables: varsOut
       });
     } else {
       for (var j = 0; j < cfg.tasks.length; j++) {
@@ -508,7 +621,8 @@ function submitTask(ev) {
           cfg.tasks[j] = {
             id: id, enabled: enabled,
             watch: { directory: dir, glob: glob, debounceMs: debounce, stabilizationMs: stab },
-            pipeline: steps
+            pipeline: steps,
+            variables: varsOut
           };
           break;
         }
@@ -517,7 +631,36 @@ function submitTask(ev) {
     return fetch('/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(cfg) });
   }).then(function(){ alert('Task saved'); location.href='/ui/tasks'; }).catch(function(e){ alert('Save failed: ' + e.message); });
 }
-render();
+
+function deleteTask() {
+  var id = document.getElementById('id').value.trim();
+  if (!id) return;
+  if (!confirm('Are you sure you want to delete task "' + id + '"?')) return;
+  
+  fetch('/config').then(function(r){ return r.json(); }).then(function(cfg){
+    if (!Array.isArray(cfg.tasks)) return;
+    
+    // Filter out the task with the matching ID
+    cfg.tasks = cfg.tasks.filter(function(task) {
+      return task.id !== id;
+    });
+    
+    return fetch('/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(cfg) });
+  }).then(function(){ alert('Task deleted'); location.href='/ui/tasks'; }).catch(function(e){ alert('Delete failed: ' + e.message); });
+}
+
+// Ensure DOM is ready before rendering
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing...');
+    render();
+    renderVars();
+  });
+} else {
+  console.log('DOM already ready, initializing...');
+  render();
+  renderVars();
+}
 </script>
 `))
 
@@ -663,7 +806,20 @@ func (s *Server) mountUI() {
 				}
 			}
 		}
-		pj, _ := json.Marshal(pipeline)
+		// Normalize pipeline into a JSON array for embedding.
+		// pipeline may be []any or a single object depending on legacy shape.
+		var arr []any
+		switch x := pipeline.(type) {
+		case nil:
+			arr = []any{}
+		case []any:
+			arr = x
+		default:
+			// wrap single step object into array
+			arr = []any{x}
+		}
+		pj, _ := json.Marshal(arr)
+
 		var d taskEdit
 		d.Mode = "Edit"
 		if taskObj != nil {
@@ -688,14 +844,10 @@ func (s *Server) mountUI() {
 			// task not found; display empty editor with id filled from query
 			d.Task.ID = id
 		}
-		// Ensure valid JSON array or object is embedded and not empty
-		js := "[]"
-		if len(pj) > 0 && string(pj) != "null" {
-			if len(pj) > 0 && pj[0] == '[' {
-				js = string(pj)
-			} else {
-				js = "[" + string(pj) + "]"
-			}
+		// Ensure a JSON array string for the client script
+		js := string(pj)
+		if js == "" || js == "null" {
+			js = "[]"
 		}
 		d.PipelineJSON = template.JS(js)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")

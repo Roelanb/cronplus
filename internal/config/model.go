@@ -45,11 +45,18 @@ type PipelineStep struct {
 	Delete  *DeleteStep  `json:"delete,omitempty"`
 }
 
+type Variable struct {
+	Name  string `json:"name"`  // unique per task
+	Type  string `json:"type"`  // string|int|bool|date|datetime
+	Value string `json:"value"` // raw textual value; validated on load
+}
+
 type Task struct {
-	ID       string         `json:"id"`
-	Enabled  bool           `json:"enabled"`
-	Watch    WatchSpec      `json:"watch"`
-	Pipeline []PipelineStep `json:"pipeline"`
+	ID        string         `json:"id"`
+	Enabled   bool           `json:"enabled"`
+	Watch     WatchSpec      `json:"watch"`
+	Pipeline  []PipelineStep `json:"pipeline"`
+	Variables []Variable     `json:"variables,omitempty"`
 }
 
 type LoggingCfg struct {

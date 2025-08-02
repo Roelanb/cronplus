@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 )
 
 // CopyOptions controls copy behavior.
@@ -19,6 +20,26 @@ type CopyOptions struct {
 // DeleteOptions controls deletion behavior.
 type DeleteOptions struct {
 	Secure bool // placeholder; secure deletion not implemented in this iteration
+}
+
+var varPattern = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
+
+// ResolveVariables replaces ${name} tokens in s using vars map.
+// If a variable is not present, the token is left as-is.
+func ResolveVariables(s string, vars map[string]string) string {
+	if s == "" || len(vars) == 0 {
+		return s
+	}
+	return varPattern.ReplaceAllStringFunc(s, func(tok string) string {
+		m := varPattern.FindStringSubmatch(tok)
+		if len(m) != 2 {
+			return tok
+		}
+		if v, ok := vars[m[1]]; ok {
+			return v
+		}
+		return tok
+	})
 }
 
 // Copy copies src file to destination directory, preserving filename.
