@@ -1,0 +1,197 @@
+{
+  "tasks": [
+    {
+      "id": "api-workflow",
+      "enabled": true,
+      "watchConfig": {
+        "directory": "/data/uploads",
+        "pattern": "*.csv",
+        "debounceMilliseconds": 1000
+      },
+      "variables": {
+        "apiEndpoint": "https://api.example.com",
+        "apiKey": "your-api-key-here"
+      },
+      "pipeline": [
+        {
+          "type": "decision",
+          "name": "Check File Size",
+          "rules": [
+            {
+              "name": "Large File Rule",
+              "conditions": [
+                {
+                  "field": "file.sizemb",
+                  "operator": "GreaterThan",
+                  "value": 10
+                }
+              ],
+              "action": "Continue",
+              "setVariable": "fileCategory",
+              "setVariableValue": "large",
+              "logMessage": "Processing large file: {fileName}"
+            },
+            {
+              "name": "Small File Rule",
+              "conditions": [
+                {
+                  "field": "file.sizemb",
+                  "operator": "LessThanOrEqual",
+                  "value": 10
+                }
+              ],
+              "action": "Continue",
+              "setVariable": "fileCategory",
+              "setVariableValue": "small"
+            }
+          ],
+          "defaultAction": "Continue"
+        },
+        {
+          "type": "restapi",
+          "name": "Upload to API",
+          "url": "{apiEndpoint}/files/upload",
+          "method": "POST",
+          "apiKey": "{apiKey}",
+          "apiKeyHeaderName": "X-API-Key",
+          "sendFileAsFormData": true,
+          "formFieldName": "file",
+          "queryParameters": {
+            "category": "{fileCategory}",
+            "timestamp": "{timestamp}"
+          },
+          "maxRetries": 3,
+          "retryDelayMilliseconds": 2000,
+          "useExponentialBackoff": true,
+          "responseVariable": "uploadResponse",
+          "statusCodeVariable": "uploadStatus",
+          "failOnNonSuccessCode": true
+        },
+        {
+          "type": "decision",
+          "name": "Check Upload Result",
+          "rules": [
+            {
+              "name": "Success Rule",
+              "conditions": [
+                {
+                  "field": "uploadStatus",
+                  "operator": "Equals",
+                  "value": 200
+                }
+              ],
+              "action": "Continue",
+              "logMessage": "File uploaded successfully"
+            },
+            {
+              "name": "Rate Limited Rule",
+              "conditions": [
+                {
+                  "field": "uploadStatus",
+                  "operator": "Equals",
+                  "value": 429
+                }
+              ],
+              "action": "Stop",
+              "logMessage": "Rate limited - stopping pipeline"
+            }
+          ],
+          "defaultAction": "Fail"
+        },
+        {
+          "type": "restapi",
+          "name": "Notify Webhook",
+          "url": "https://hooks.example.com/notify",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"file\": \"{fileName}\", \"status\": \"processed\", \"category\": \"{fileCategory}\", \"uploadId\": \"{uploadResponse}\"}",
+          "maxRetries": 2,
+          "failOnNonSuccessCode": false
+        },
+        {
+          "type": "archive",
+          "name": "Archive Processed File",
+          "archivePath": "/data/processed/{date}/processed.zip",
+          "format": "Zip",
+          "deleteOriginal": true,
+          "conflictStrategy": "IncrementNumber"
+        }
+      ]
+    },
+    {
+      "id": "conditional-processing",
+      "enabled": true,
+      "watchConfig": {
+        "directory": "/data/incoming",
+        "pattern": "*.*",
+        "debounceMilliseconds": 500
+      },
+      "pipeline": [
+        {
+          "type": "decision",
+          "name": "Route by File Type",
+          "rules": [
+            {
+              "name": "Image Files",
+              "conditions": [
+                {
+                  "field": "fileExt",
+                  "operator": "In",
+                  "value": ".jpg,.jpeg,.png,.gif,.bmp"
+                }
+              ],
+              "action": "Continue",
+              "setVariable": "processType",
+              "setVariableValue": "image"
+            },
+            {
+              "name": "Document Files",
+              "conditions": [
+                {
+                  "field": "fileExt",
+                  "operator": "In",
+                  "value": ".pdf,.doc,.docx,.txt"
+                }
+              ],
+              "action": "Continue",
+              "setVariable": "processType",
+              "setVariableValue": "document"
+            },
+            {
+              "name": "Old Files",
+              "logic": "And",
+              "conditions": [
+                {
+                  "field": "file.agedays",
+                  "operator": "GreaterThan",
+                  "value": 30
+                },
+                {
+                  "field": "file.size",
+                  "operator": "LessThan",
+                  "value": 1048576
+                }
+              ],
+              "action": "Skip",
+              "logMessage": "Skipping old small file: {fileName}"
+            }
+          ],
+          "defaultAction": "Continue",
+          "setVariable": "processType",
+          "setVariableValue": "unknown"
+        },
+        {
+          "type": "copy",
+          "name": "Sort by Type",
+          "destinationPath": "/data/sorted/{processType}/{date}",
+          "renamePattern": "{name}_{timestamp}{ext}",
+          "useAtomicMove": true,
+          "verifyChecksum": true,
+          "deleteSourceAfterCopy": true
+        }
+      ]
+    }
+  ]
+}
